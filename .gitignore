@@ -3,3 +3,25 @@
 
 # Claude agent data
 .claude/data/
+
+# Generated files (keep directory structure)
+html/*.html
+css/*.css
+js/*.js
+tests/*.spec.js
+tests/test-results/
+tests/*-snapshots/
+
+# Downloaded assets
+assets/
+figma-screenshots/
+figma-data.json
+FIGMA_MEASUREMENTS.md
+
+# Node modules and dependencies
+node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
