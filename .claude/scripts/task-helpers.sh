@@ -290,7 +290,7 @@ log_to_task_file() {
 
   # Find implementation log section and add entry
   local timestamp=$(date -u +%Y-%m-%dT%H:%M:%S)
-  sed -i.bak "/^```$/a\\
+  sed -i.bak "/^\`\`\`$/a\\
 $timestamp - $message" "$task_file"
 
   rm "${task_file}.bak"

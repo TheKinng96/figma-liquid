@@ -18,6 +18,7 @@ SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/branch-detector.sh"
 source "$SCRIPT_DIR/task-helpers.sh"
 source "$SCRIPT_DIR/visual-validator.sh"
+source "$SCRIPT_DIR/figma-extractor.sh"
 
 BRANCH_ARG=$1
 
@@ -174,18 +175,34 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}Phase 2: HTML Implementation${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-echo -e "${YELLOW}Claude will now:${NC}"
-echo -e "  1. Analyze Figma component using MCP"
-echo -e "  2. Generate semantic HTML structure"
-echo -e "  3. Create BEM CSS styles"
-echo -e "  4. Add JavaScript if needed"
-echo -e "  5. Create Playwright tests"
-echo -e "  6. Run visual validation"
-echo -e "  7. Update task file with results"
+# Extract Figma assets and measurements
+echo -e "${YELLOW}Step 1: Extract Figma Assets & Measurements${NC}\n"
+if [ -n "$FIGMA_LINK" ]; then
+  extract_all "$FIGMA_LINK" "$TASK_SLUG"
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ All assets and measurements extracted${NC}\n"
+  else
+    echo -e "${YELLOW}⚠️  Asset extraction had issues, proceeding anyway${NC}\n"
+  fi
+else
+  echo -e "${YELLOW}⚠️  No Figma link found, skipping asset extraction${NC}\n"
+fi
+
+echo -e "${YELLOW}Step 2: Claude Implementation${NC}\n"
+echo -e "Claude will now:"
+echo -e "  1. Use extracted assets from assets/ directory"
+echo -e "  2. Apply pixel-perfect measurements from FIGMA_MEASUREMENTS.md"
+echo -e "  3. Generate semantic HTML structure"
+echo -e "  4. Create BEM CSS with exact Figma values"
+echo -e "  5. Add JavaScript if needed"
+echo -e "  6. Create Playwright tests"
+echo -e "  7. Run visual validation"
+echo -e "  8. Update task file with results"
 echo ""
 
 # Log to task file
 log_to_task_file "$TASK_FILE" "Phase 2 started"
+log_to_task_file "$TASK_FILE" "Assets extracted from Figma"
 
 # Set up Playwright if not already configured
 if [ ! -f playwright.config.js ]; then
@@ -235,16 +252,25 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${YELLOW}Ready for Implementation${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-echo -e "${GREEN}Environment ready. Claude will now:${NC}"
-echo -e "  1. Use MCP to fetch Figma component data"
-echo -e "  2. Generate HTML at: ${BLUE}html/$TASK_SLUG.html${NC}"
-echo -e "  3. Generate CSS at: ${BLUE}css/$TASK_SLUG.css${NC}"
-echo -e "  4. Generate tests at: ${BLUE}tests/$TASK_SLUG.spec.js${NC}"
-echo -e "  5. Run Playwright tests"
-echo -e "  6. Validate visual match ≥98%"
+echo -e "${GREEN}Environment ready. Claude should now:${NC}"
+echo -e "  1. Read ${BLUE}FIGMA_MEASUREMENTS.md${NC} for exact dimensions"
+echo -e "  2. Read ${BLUE}figma-data.json${NC} for detailed structure & colors"
+echo -e "  3. Use assets from ${BLUE}assets/${NC} directory (logo, icons)"
+echo -e "  4. Generate HTML at: ${BLUE}html/$TASK_SLUG.html${NC}"
+echo -e "  5. Generate CSS at: ${BLUE}css/$TASK_SLUG.css${NC} with pixel-perfect measurements"
+echo -e "  6. Generate JS at: ${BLUE}js/$TASK_SLUG.js${NC} (if needed)"
+echo -e "  7. Generate tests at: ${BLUE}tests/$TASK_SLUG.spec.js${NC}"
+echo -e "  8. Run Playwright tests"
+echo -e "  9. Validate visual match ≥98% against ${BLUE}figma-screenshots/$(basename $TASK_SLUG)-original.png${NC}"
+echo ""
+echo -e "${YELLOW}IMPORTANT:${NC}"
+echo -e "  - Use EXACT pixel values from FIGMA_MEASUREMENTS.md"
+echo -e "  - Use REAL assets from assets/ (not custom SVGs)"
+echo -e "  - Extract colors from figma-data.json fills"
+echo -e "  - Match layout positions exactly (gaps, spacing)"
 echo ""
 echo -e "${YELLOW}After implementation, tests will run automatically.${NC}"
 echo -e "${YELLOW}Task will be marked complete when all tests pass.${NC}\n"
 
-# Note: Actual implementation happens through Claude's MCP and code generation
-# This script sets up the environment and provides structure
+# Note: Actual implementation happens through Claude's analysis and code generation
+# This script extracts all necessary data and sets up the environment
