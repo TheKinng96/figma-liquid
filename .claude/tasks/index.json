@@ -1,0 +1,21 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "issueNumber": 1,
+      "title": "Component 1",
+      "slug": "component-1",
+      "branch": "issue-1-component-1",
+      "file": "issue-1-component-1.md",
+      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/%E3%80%90%E5%AE%8C%E4%BA%86%E3%80%91%E5%90%89%E5%B7%9D%E5%95%86%E4%BA%8B%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE--Copy-?node-id=111-786&m=dev",
+      "complexity": 5,
+      "status": "pending",
+      "phase": "analysis",
+      "created": "2025-10-06T06:53:33Z",
+      "updated": "2025-10-06T06:53:33Z",
+      "htmlComplete": false,
+      "liquidComplete": false,
+      "testsPass": false
+    }
+  ]
+}
