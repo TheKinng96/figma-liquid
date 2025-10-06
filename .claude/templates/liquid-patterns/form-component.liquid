@@ -1,0 +1,318 @@
+{% comment %}
+  Contact Form Section
+  Example form with validation and Shopify integration
+{% endcomment %}
+
+<section class="contact-form-section">
+  <div class="container">
+    {% if section.settings.heading %}
+      <h2 class="contact-form__heading">{{ section.settings.heading }}</h2>
+    {% endif %}
+
+    {% if section.settings.description %}
+      <div class="contact-form__description">
+        {{ section.settings.description }}
+      </div>
+    {% endif %}
+
+    {% form 'contact' %}
+      {% if form.posted_successfully? %}
+        <div class="contact-form__success" role="status">
+          <p>{{ section.settings.success_message | default: 'Thanks for contacting us. We'll get back to you as soon as possible.' }}</p>
+        </div>
+      {% endif %}
+
+      {% if form.errors %}
+        <div class="contact-form__errors" role="alert">
+          <h3>Please fix the following errors:</h3>
+          <ul>
+            {% for field in form.errors %}
+              <li>{{ field | capitalize }} {{ form.errors.messages[field] }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="contact-form__grid">
+        <div class="form-group">
+          <label class="form-group__label" for="contact-name">
+            Name <span class="required" aria-label="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="contact-name"
+            name="contact[name]"
+            class="form-group__input"
+            value="{% if form.name %}{{ form.name }}{% elsif customer %}{{ customer.name }}{% endif %}"
+            required
+            aria-required="true"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-group__label" for="contact-email">
+            Email <span class="required" aria-label="required">*</span>
+          </label>
+          <input
+            type="email"
+            id="contact-email"
+            name="contact[email]"
+            class="form-group__input"
+            value="{% if form.email %}{{ form.email }}{% elsif customer %}{{ customer.email }}{% endif %}"
+            required
+            aria-required="true"
+          >
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-group__label" for="contact-phone">
+          Phone
+        </label>
+        <input
+          type="tel"
+          id="contact-phone"
+          name="contact[phone]"
+          class="form-group__input"
+          value="{% if form.phone %}{{ form.phone }}{% elsif customer %}{{ customer.phone }}{% endif %}"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-group__label" for="contact-message">
+          Message <span class="required" aria-label="required">*</span>
+        </label>
+        <textarea
+          id="contact-message"
+          name="contact[body]"
+          class="form-group__textarea"
+          rows="6"
+          required
+          aria-required="true"
+        >{% if form.body %}{{ form.body }}{% endif %}</textarea>
+      </div>
+
+      <div class="contact-form__footer">
+        <button type="submit" class="button button--primary">
+          {{ section.settings.button_text | default: 'Send Message' }}
+        </button>
+      </div>
+    {% endform %}
+  </div>
+</section>
+
+{% stylesheet %}
+  .contact-form-section {
+    padding: 3rem 0;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .contact-form__heading {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+  }
+
+  .contact-form__description {
+    text-align: center;
+    margin: 0 0 2rem;
+    color: var(--color-text-secondary, #666);
+  }
+
+  .contact-form__success {
+    padding: 1rem;
+    background: var(--color-success-bg, #d4edda);
+    color: var(--color-success-text, #155724);
+    border: 1px solid var(--color-success-border, #c3e6cb);
+    border-radius: 4px;
+    margin-bottom: 2rem;
+  }
+
+  .contact-form__errors {
+    padding: 1rem;
+    background: var(--color-error-bg, #f8d7da);
+    color: var(--color-error-text, #721c24);
+    border: 1px solid var(--color-error-border, #f5c6cb);
+    border-radius: 4px;
+    margin-bottom: 2rem;
+  }
+
+  .contact-form__errors h3 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .contact-form__errors ul {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .contact-form__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .contact-form__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group__label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--color-text, #000);
+  }
+
+  .required {
+    color: var(--color-error-text, #c9302c);
+  }
+
+  .form-group__input,
+  .form-group__textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+  }
+
+  .form-group__input:focus,
+  .form-group__textarea:focus {
+    outline: none;
+    border-color: var(--color-primary, #0066cc);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  }
+
+  .form-group__input[aria-invalid="true"],
+  .form-group__textarea[aria-invalid="true"] {
+    border-color: var(--color-error-border, #c9302c);
+  }
+
+  .form-group__textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+
+  .contact-form__footer {
+    margin-top: 1.5rem;
+  }
+
+  .button {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .button--primary {
+    background: var(--color-primary, #000);
+    color: var(--color-primary-text, #fff);
+  }
+
+  .button--primary:hover {
+    background: var(--color-primary-hover, #333);
+  }
+
+  .button--primary:disabled {
+    background: var(--color-muted-bg, #ccc);
+    cursor: not-allowed;
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  // Client-side form validation
+  document.querySelector('.contact-form-section form').addEventListener('submit', (e) => {
+    const form = e.target;
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+
+    requiredFields.forEach(field => {
+      if (!field.value.trim()) {
+        field.setAttribute('aria-invalid', 'true');
+        isValid = false;
+      } else {
+        field.removeAttribute('aria-invalid');
+      }
+    });
+
+    // Email validation
+    const emailField = form.querySelector('[type="email"]');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailField && !emailRegex.test(emailField.value)) {
+      emailField.setAttribute('aria-invalid', 'true');
+      isValid = false;
+    }
+
+    if (!isValid) {
+      e.preventDefault();
+      form.querySelector('[aria-invalid="true"]').focus();
+    }
+  });
+
+  // Remove error state on input
+  document.querySelectorAll('.form-group__input, .form-group__textarea').forEach(field => {
+    field.addEventListener('input', () => {
+      if (field.value.trim()) {
+        field.removeAttribute('aria-invalid');
+      }
+    });
+  });
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Contact Form",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Contact Us"
+    },
+    {
+      "type": "textarea",
+      "id": "description",
+      "label": "Description",
+      "default": "Have a question? We'd love to hear from you."
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Button Text",
+      "default": "Send Message"
+    },
+    {
+      "type": "textarea",
+      "id": "success_message",
+      "label": "Success Message",
+      "default": "Thanks for contacting us. We'll get back to you as soon as possible."
+    }
+  ],
+  "presets": [
+    {
+      "name": "Contact Form"
+    }
+  ]
+}
+{% endschema %}

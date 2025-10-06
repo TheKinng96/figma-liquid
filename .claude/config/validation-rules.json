@@ -1,0 +1,39 @@
+{
+  "visualThreshold": 0.98,
+  "layoutTolerance": 5,
+  "maxComponentSize": 100,
+  "viewports": {
+    "desktop": {
+      "width": 1920,
+      "height": 1080
+    },
+    "tablet": {
+      "width": 768,
+      "height": 1024
+    },
+    "mobile": {
+      "width": 375,
+      "height": 667
+    }
+  },
+  "requiredTests": [
+    "desktop",
+    "tablet",
+    "mobile",
+    "accessibility"
+  ],
+  "lighthouseMinScore": 80,
+  "accessibility": {
+    "minContrastRatio": 4.5,
+    "minContrastRatioLarge": 3,
+    "wcagLevel": "AA"
+  },
+  "performance": {
+    "maxPixelDifference": 500,
+    "maxFileSize": {
+      "html": 102400,
+      "css": 51200,
+      "js": 51200
+    }
+  }
+}

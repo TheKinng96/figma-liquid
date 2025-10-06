@@ -1,0 +1,55 @@
+{
+  "maxElements": 8,
+  "maxNestingDepth": 4,
+  "maxComplexityScore": 7,
+  "forceBreakdown": true,
+  "scoringWeights": {
+    "elements": 0.5,
+    "depth": 1.5,
+    "interactions": 2.0,
+    "dataSources": 1.5
+  },
+  "complexityLevels": {
+    "simple": {
+      "min": 0,
+      "max": 3,
+      "label": "Simple Atom"
+    },
+    "acceptable": {
+      "min": 4,
+      "max": 7,
+      "label": "Acceptable Component"
+    },
+    "complex": {
+      "min": 8,
+      "max": 10,
+      "label": "Complex - Consider Splitting"
+    },
+    "mustSplit": {
+      "min": 11,
+      "max": 999,
+      "label": "MUST SPLIT"
+    }
+  },
+  "componentTypes": {
+    "atom": {
+      "maxElements": 1,
+      "maxComplexity": 3
+    },
+    "molecule": {
+      "maxElements": 5,
+      "maxComplexity": 6
+    },
+    "organism": {
+      "maxElements": 8,
+      "maxComplexity": 7
+    }
+  },
+  "autoSplitTriggers": [
+    "More than 8 direct child elements",
+    "More than 4 levels of nesting",
+    "Multiple distinct interactive features (3+)",
+    "Multiple data sources (3+)",
+    "Estimated >100 lines of code"
+  ]
+}

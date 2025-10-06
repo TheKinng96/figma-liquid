@@ -1,1 +1,5 @@
 .keys
+.env
+
+# Claude agent data
+.claude/data/
