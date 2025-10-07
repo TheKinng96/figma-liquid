@@ -1,13 +1,13 @@
 {
-  "id": "5",
-  "issueNumber": 5,
-  "title": "SP_商品詳細",
-  "slug": "sp-",
-  "branch": "issue-5-sp-",
-  "nodeId": "111:1875",
-  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-1875",
-  "complexity": 7,
-  "type": "mobile",
+  "id": "12",
+  "issueNumber": 12,
+  "title": "Frame 1685",
+  "slug": "frame-1685",
+  "branch": "issue-12-frame-1685",
+  "nodeId": "111:852",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/%E3%80%90%E5%AE%8C%E4%BA%86%E3%80%91%E5%90%89%E5%B7%9D%E5%95%86%E4%BA%8B%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE--Copy-?node-id=111-48&p=f&t=k4T5zU6D7Nbj7TcW-0&node-id=111-852",
+  "complexity": 5,
+  "type": "section",
   "status": "pending",
   "phase": "analysis"
 }
