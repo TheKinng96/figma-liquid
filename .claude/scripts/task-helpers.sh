@@ -18,7 +18,14 @@ init_tasks() {
   mkdir -p "$TASKS_DIR"
 
   if [ ! -f "$INDEX_FILE" ]; then
-    echo '{"tasks":[]}' > "$INDEX_FILE"
+    cat > "$INDEX_FILE" << 'EOF'
+{
+  "tasks": [],
+  "version": "2.0",
+  "lastUpdated": "",
+  "description": "Task files are now individual JSON files for better visibility. Each task is stored in task1.json, task2.json, etc. This index only lists the filenames."
+}
+EOF
     echo -e "${GREEN}✓ Task index created${NC}"
   fi
 }
@@ -227,11 +234,16 @@ list_tasks() {
   echo -e "${BLUE}Tasks${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-  if [ "$status_filter" = "all" ]; then
-    jq -r '.tasks[] | "\(.id). [\(.status)] \(.title) (branch: \(.branch))"' "$INDEX_FILE"
-  else
-    jq -r ".tasks[] | select(.status == \"$status_filter\") | \"\(.id). [\(.status)] \(.title) (branch: \(.branch))\"" "$INDEX_FILE"
-  fi
+  # Read from individual task JSON files
+  for task_file in $TASKS_DIR/task*.json; do
+    if [ -f "$task_file" ]; then
+      if [ "$status_filter" = "all" ]; then
+        jq -r '"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))"' "$task_file"
+      else
+        jq -r "select(.status == \"$status_filter\") | \"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))\"" "$task_file"
+      fi
+    fi
+  done
 
   echo ""
 }

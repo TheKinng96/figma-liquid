@@ -1,0 +1,13 @@
+{
+  "id": "5",
+  "issueNumber": 5,
+  "title": "SP_商品詳細",
+  "slug": "sp-",
+  "branch": "issue-5-sp-",
+  "nodeId": "111:1875",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-1875",
+  "complexity": 7,
+  "type": "mobile",
+  "status": "pending",
+  "phase": "analysis"
+}

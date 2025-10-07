@@ -1,0 +1,13 @@
+{
+  "id": "2",
+  "issueNumber": 2,
+  "title": "PC_TOP",
+  "slug": "pc-top",
+  "branch": "issue-2-pc-top",
+  "nodeId": "111:58",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-58",
+  "complexity": 8,
+  "type": "desktop",
+  "status": "pending",
+  "phase": "analysis"
+}

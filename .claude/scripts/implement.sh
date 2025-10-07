@@ -129,12 +129,21 @@ COMPLEXITY=$(get_task_complexity "$TARGET_BRANCH")
 FIGMA_LINK=$(get_figma_link "$TARGET_BRANCH")
 STATUS=$(get_task_status "$TARGET_BRANCH")
 
-# Extract node ID from task index
-NODE_ID=$(jq -r ".tasks[] | select(.branch == \"$TARGET_BRANCH\") | .nodeId // empty" .claude/tasks/index.json)
+# Extract node ID from individual task JSON files
+NODE_ID=""
+for task_json in .claude/tasks/task*.json; do
+  if [ -f "$task_json" ]; then
+    branch_match=$(jq -r "select(.branch == \"$TARGET_BRANCH\") | .nodeId // empty" "$task_json" 2>/dev/null || echo "")
+    if [ -n "$branch_match" ]; then
+      NODE_ID="$branch_match"
+      break
+    fi
+  fi
+done
 
 if [ -z "$NODE_ID" ]; then
-  echo -e "${YELLOW}⚠️  No node ID found in task index${NC}"
-  echo -e "${YELLOW}Attempting to extract from task file...${NC}"
+  echo -e "${YELLOW}⚠️  No node ID found in task JSON files${NC}"
+  echo -e "${YELLOW}Attempting to extract from task markdown file...${NC}"
   NODE_ID=$(grep -A 1 "## Figma Node ID" "$TASK_FILE" | tail -1 | tr -d '`' || echo "")
 fi
 
