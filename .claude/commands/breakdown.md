@@ -18,7 +18,53 @@ Execute the breakdown.sh script to automatically extract components from Figma a
    - Display list of found components with node IDs
    - Allow user to select which components to process
 
-3. **For Each Selected Component:**
+3. **Validate Component Size (Critical!)**
+
+   For each component, the script automatically:
+
+   a. **Count child nodes** in the component tree
+   b. **Check against thresholds**:
+      - ✅ **< 300 nodes**: Safe, will work with MCP
+      - ⚠️ **300-500 nodes**: Warning, may need splitting
+      - ❌ **> 500 nodes**: Too large, will exceed MCP 25k token limit
+
+   c. **If component is too large (>500 nodes)**:
+      - Script displays error message
+      - Shows node count
+      - Offers to skip component
+      - **User should either**:
+        1. Skip and manually split in Figma
+        2. Continue anyway (will fail during `/implement`)
+
+   **Why This Matters:**
+   - MCP tools (`get_metadata`, `get_code`) have 25,000 token limit
+   - Components >500 nodes typically exceed this limit
+   - If not caught here, `/implement` will fail with token error
+
+   **How to Split Large Components:**
+
+   If a component is too large, you have two options:
+
+   **Option A: Split in Figma (Recommended)**
+   1. Open Figma file
+   2. Identify major sections in the large component (header, hero, product-grid, footer, etc.)
+   3. Create separate top-level frames for each section
+   4. Re-export Figma JSON
+   5. Re-run `/breakdown`
+
+   **Option B: Auto-Split via Script**
+   1. Script detects large component
+   2. Extracts direct children frames
+   3. Creates separate tasks for each child
+   4. Maintains correct order based on Y-position
+   5. Example: `PC_TOP` (786 nodes) → `PC_TOP_Header` (120 nodes), `PC_TOP_Hero` (80 nodes), `PC_TOP_Products` (200 nodes), etc.
+
+   **Order Preservation:**
+   - Child components are sorted by vertical position (Y coordinate)
+   - Ensures sections are implemented in visual order (top to bottom)
+   - Task naming: `{parent}-section-{N}` or `{parent}-{child-name}`
+
+4. **For Each Selected Component:**
    - Extract node ID (e.g., `111:58` for PC_TOP)
    - Create slug from component name
    - Calculate initial complexity score:
