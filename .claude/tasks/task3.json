@@ -1,0 +1,13 @@
+{
+  "id": "4",
+  "issueNumber": 4,
+  "title": "PC_商品詳細",
+  "slug": "pc-",
+  "branch": "issue-4-pc-",
+  "nodeId": "111:2244",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-2244",
+  "complexity": 7,
+  "type": "desktop",
+  "status": "pending",
+  "phase": "analysis"
+}

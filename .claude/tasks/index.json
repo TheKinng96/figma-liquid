@@ -1,97 +1,14 @@
 {
   "tasks": [
-    {
-      "id": "2",
-      "issueNumber": 2,
-      "title": "PC_TOP",
-      "slug": "pc-top",
-      "branch": "issue-2-pc-top",
-      "nodeId": "111:58",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-58",
-      "complexity": 8,
-      "type": "desktop",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "3",
-      "issueNumber": 3,
-      "title": "SP_TOP",
-      "slug": "sp-top",
-      "branch": "issue-3-sp-top",
-      "nodeId": "111:856",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-856",
-      "complexity": 8,
-      "type": "mobile",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "4",
-      "issueNumber": 4,
-      "title": "PC_商品詳細",
-      "slug": "pc-",
-      "branch": "issue-4-pc-",
-      "nodeId": "111:2244",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-2244",
-      "complexity": 7,
-      "type": "desktop",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "5",
-      "issueNumber": 5,
-      "title": "SP_商品詳細",
-      "slug": "sp-",
-      "branch": "issue-5-sp-",
-      "nodeId": "111:1875",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-1875",
-      "complexity": 7,
-      "type": "mobile",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "6",
-      "issueNumber": 6,
-      "title": "PC_コレクションテンプレート（ブランド）",
-      "slug": "pc-",
-      "branch": "issue-6-pc-",
-      "nodeId": "111:2524",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-2524",
-      "complexity": 6,
-      "type": "desktop",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "7",
-      "issueNumber": 7,
-      "title": "SP_コレクションテンプレート（ブランド）",
-      "slug": "sp-",
-      "branch": "issue-7-sp-",
-      "nodeId": "111:1339",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-1339",
-      "complexity": 6,
-      "type": "mobile",
-      "status": "pending",
-      "phase": "analysis"
-    },
-    {
-      "id": "8",
-      "issueNumber": 8,
-      "title": "ドロワー",
-      "slug": "",
-      "branch": "issue-8-",
-      "nodeId": "111:2116",
-      "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-2116",
-      "complexity": 5,
-      "type": "component",
-      "status": "pending",
-      "phase": "analysis"
-    }
+    "task1.json",
+    "task2.json",
+    "task3.json",
+    "task4.json",
+    "task5.json",
+    "task6.json",
+    "task7.json"
   ],
-  "version": "1.0",
-  "lastUpdated": "2025-10-07T02:54:23Z"
+  "version": "2.0",
+  "lastUpdated": "2025-10-07T03:05:52Z",
+  "description": "Task files are now individual JSON files for better visibility"
 }
