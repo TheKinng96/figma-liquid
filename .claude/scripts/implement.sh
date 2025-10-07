@@ -169,7 +169,7 @@ fi
 update_task_phase "$TARGET_BRANCH" "html"
 
 # Create output directories
-mkdir -p html css js tests
+mkdir -p html/html html/css html/js html/tests
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Phase 2: HTML Implementation${NC}"
@@ -212,7 +212,7 @@ if [ ! -f playwright.config.js ]; then
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './html/tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -256,10 +256,10 @@ echo -e "${GREEN}Environment ready. Claude should now:${NC}"
 echo -e "  1. Read ${BLUE}FIGMA_MEASUREMENTS.md${NC} for exact dimensions"
 echo -e "  2. Read ${BLUE}figma-data.json${NC} for detailed structure & colors"
 echo -e "  3. Use assets from ${BLUE}assets/${NC} directory (logo, icons)"
-echo -e "  4. Generate HTML at: ${BLUE}html/$TASK_SLUG.html${NC}"
-echo -e "  5. Generate CSS at: ${BLUE}css/$TASK_SLUG.css${NC} with pixel-perfect measurements"
-echo -e "  6. Generate JS at: ${BLUE}js/$TASK_SLUG.js${NC} (if needed)"
-echo -e "  7. Generate tests at: ${BLUE}tests/$TASK_SLUG.spec.js${NC}"
+echo -e "  4. Generate HTML at: ${BLUE}html/html/$TASK_SLUG.html${NC}"
+echo -e "  5. Generate CSS at: ${BLUE}html/css/$TASK_SLUG.css${NC} with pixel-perfect measurements"
+echo -e "  6. Generate JS at: ${BLUE}html/js/$TASK_SLUG.js${NC} (if needed)"
+echo -e "  7. Generate tests at: ${BLUE}html/tests/$TASK_SLUG.spec.js${NC}"
 echo -e "  8. Run Playwright tests"
 echo -e "  9. Validate visual match ≥98% against ${BLUE}figma-screenshots/$(basename $TASK_SLUG)-original.png${NC}"
 echo ""

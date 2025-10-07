@@ -117,8 +117,10 @@ while IFS= read -r figma_link; do
 - [ ] Playwright tests passing
 
 ## Files
-- \`html/$SLUG.html\`
-- \`css/$SLUG.css\`
+- \`html/html/$SLUG.html\`
+- \`html/css/$SLUG.css\`
+- \`html/js/$SLUG.js\` (if needed)
+- \`html/tests/$SLUG.spec.js\`
 - \`theme/sections/$SLUG.liquid\`
 
 ---

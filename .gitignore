@@ -5,12 +5,12 @@
 .claude/data/
 
 # Generated files (keep directory structure)
-html/*.html
-css/*.css
-js/*.js
-tests/*.spec.js
-tests/test-results/
-tests/*-snapshots/
+html/html/*.html
+html/css/*.css
+html/js/*.js
+html/tests/*.spec.js
+html/tests/test-results/
+html/tests/*-snapshots/
 
 # Downloaded assets
 assets/
