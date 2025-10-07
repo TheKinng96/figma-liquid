@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Figma to Shopify Liquid - Breakdown Components
-# Analyze Figma design, create tasks, GitHub issues, and branches
+# Automatically analyze Figma design, create tasks, GitHub issues, and branches
 
 set -e
 
@@ -24,6 +24,14 @@ if [ ! -f .claude/data/figma-project.json ]; then
   exit 1
 fi
 
+# Check for Figma JSON file
+FIGMA_JSON="figma-full-file.json"
+if [ ! -f "$FIGMA_JSON" ]; then
+  echo -e "${RED}❌ Figma JSON file not found: $FIGMA_JSON${NC}"
+  echo -e "${YELLOW}Please export the Figma file using Figma API or place it in the root directory${NC}"
+  exit 1
+fi
+
 # Check GitHub CLI
 if ! command -v gh &> /dev/null; then
   echo -e "${RED}❌ GitHub CLI (gh) not installed.${NC}"
@@ -40,6 +48,7 @@ fi
 # Read project info
 FILE_KEY=$(jq -r '.fileKey' .claude/data/figma-project.json)
 FILE_NAME=$(jq -r '.fileName' .claude/data/figma-project.json)
+FIGMA_URL=$(jq -r '.figmaUrl' .claude/data/figma-project.json)
 
 echo -e "${BLUE}Project:${NC} $FILE_NAME"
 echo -e "${BLUE}File Key:${NC} $FILE_KEY\n"
@@ -71,55 +80,102 @@ done
 
 echo -e "${GREEN}✓ Labels created${NC}\n"
 
-# Prompt for components
+# Extract components and frames from Figma JSON
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Component Breakdown${NC}"
+echo -e "${YELLOW}Extracting Components from Figma File${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-echo -e "Paste Figma component links (one per line)"
-echo -e "Right-click component in Figma → Copy link"
-echo -e "Press Ctrl+D when done\n"
 
+# Extract top-level frames (main sections to implement)
+FRAMES=$(jq -r '
+.document.children[0].children[] |
+select(.type == "FRAME") |
+{nodeId: .id, name: .name, type: .type}
+' "$FIGMA_JSON" | jq -s '.')
+
+FRAME_COUNT=$(echo "$FRAMES" | jq 'length')
+echo -e "${BLUE}Found $FRAME_COUNT frames/sections to implement${NC}\n"
+
+# Show what we found
+echo -e "${BLUE}Frames to implement:${NC}"
+echo "$FRAMES" | jq -r '.[] | "  - \(.name) (node: \(.nodeId))"'
+echo ""
+
+# Ask user to confirm or filter
+read -p "Process all frames? (y/N): " process_all
+
+if [ "$process_all" != "y" ]; then
+  echo -e "\n${YELLOW}Enter frame numbers to process (comma-separated, e.g., 1,3,5):${NC}"
+  echo "$FRAMES" | jq -r 'to_entries | .[] | "\(.key + 1). \(.value.name)"'
+  read -p "Frame numbers: " frame_numbers
+
+  # Filter frames based on user selection
+  SELECTED_FRAMES=$(echo "$FRAMES" | jq "[.[] | select(.nodeId as \$id | \"$frame_numbers\" | split(\",\") | map(tonumber - 1) | contains([(\$FRAMES | jq -r '.[] | .nodeId' | grep -n \$id | cut -d: -f1 | head -1 | xargs -I{} expr {} - 1)]))]")
+  FRAMES="$SELECTED_FRAMES"
+fi
+
+# Process each frame
 COMPONENT_NUM=1
-while IFS= read -r figma_link; do
-  [ -z "$figma_link" ] && continue
+echo "$FRAMES" | jq -c '.[]' | while IFS= read -r frame; do
+  NODE_ID=$(echo "$frame" | jq -r '.nodeId')
+  COMPONENT_NAME=$(echo "$frame" | jq -r '.name')
 
-  echo -e "\n${BLUE}Analyzing component $COMPONENT_NUM...${NC}"
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}Processing: $COMPONENT_NAME${NC}"
+  echo -e "${BLUE}Node ID: $NODE_ID${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-  # Extract component name from link (simplified - Claude will use MCP to get actual name)
-  COMPONENT_NAME="Component $COMPONENT_NUM"
-  SLUG="component-$COMPONENT_NUM"
+  # Create slug from component name
+  SLUG=$(echo "$COMPONENT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
 
-  # Calculate complexity (placeholder - Claude will use MCP metadata)
+  # Calculate basic complexity (will be enhanced by Claude during implementation)
+  # For now, use a simple heuristic based on name patterns
   COMPLEXITY=5
+  if [[ "$COMPONENT_NAME" =~ (TOP|top) ]]; then
+    COMPLEXITY=8  # Homepage is complex
+  elif [[ "$COMPONENT_NAME" =~ (詳細|detail|Detail) ]]; then
+    COMPLEXITY=7  # Product detail is complex
+  elif [[ "$COMPONENT_NAME" =~ (SP_|PC_) ]]; then
+    COMPLEXITY=6  # Responsive sections
+  fi
+
+  # Create Figma link with node ID
+  FIGMA_LINK="$FIGMA_URL&node-id=${NODE_ID//:/-}"
 
   # Check complexity threshold
   MAX_COMPLEXITY=$(jq -r '.maxComplexityScore // 7' .claude/config/chunk-rules.json 2>/dev/null || echo "7")
 
   if [ "$COMPLEXITY" -gt "$MAX_COMPLEXITY" ]; then
     echo -e "${YELLOW}⚠️  Complexity: $COMPLEXITY/10 (threshold: $MAX_COMPLEXITY)${NC}"
-    echo -e "${YELLOW}Consider splitting this component${NC}"
-    read -p "Proceed anyway? (y/N): " proceed
-    [ "$proceed" != "y" ] && continue
+    echo -e "${YELLOW}This component may need to be split${NC}"
   fi
 
   # Create GitHub issue
-  ISSUE_BODY="**Figma Link**: $figma_link
+  ISSUE_BODY="**Figma Link**: $FIGMA_LINK
 
 ## Component Details
+- Node ID: \`$NODE_ID\`
 - Complexity: $COMPLEXITY/10
-- Type: Section/Snippet (TBD)
+- Type: Section (auto-detected)
 
 ## Tasks
-- [ ] Phase 1: Analyze Figma component
-- [ ] Phase 2: Implement HTML/CSS/JS
-- [ ] Phase 3: Convert to Liquid
+- [ ] Phase 1: Analyze Figma component using MCP
+- [ ] Phase 2: Implement HTML/CSS/JS with Playwright validation
+- [ ] Phase 3: Convert to Shopify Liquid
 - [ ] Visual validation ≥98%
-- [ ] Playwright tests passing
+- [ ] All tests passing
 
 ## Files
 - \`html/$SLUG.html\`
 - \`css/$SLUG.css\`
+- \`js/$SLUG.js\`
 - \`theme/sections/$SLUG.liquid\`
+- \`tests/$SLUG.spec.js\`
+
+## MCP Access
+This task will use Figma MCP to access node \`$NODE_ID\` for:
+- Design metadata and structure
+- CSS/styles generation
+- Screenshots for validation
 
 ---
 Generated by /breakdown"
@@ -137,15 +193,30 @@ Generated by /breakdown"
   git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 
   # Create task file
-  TASK_FILE=$(create_task_file "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$figma_link" "$COMPLEXITY")
+  TASK_FILE=$(create_task_file "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$FIGMA_LINK" "$COMPLEXITY")
+
+  # Add node ID to task file
+  echo -e "\n## Figma Node ID\n\`$NODE_ID\`\n" >> "$TASK_FILE"
+
   echo -e "${GREEN}✓ Created task file: $TASK_FILE${NC}"
 
-  # Add task to index
-  add_task "$COMPONENT_NUM" "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$BRANCH" "$figma_link" "$COMPLEXITY"
+  # Add task to index with node ID
+  add_task "$COMPONENT_NUM" "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$BRANCH" "$FIGMA_LINK" "$COMPLEXITY"
+
+  # Update task with node ID in index
+  jq "(.tasks[] | select(.branch == \"$BRANCH\") | .nodeId) = \"$NODE_ID\"" \
+    .claude/tasks/index.json > .claude/tasks/index.json.tmp && \
+    mv .claude/tasks/index.json.tmp .claude/tasks/index.json
 
   # Commit task file
   git add "$TASK_FILE" .claude/tasks/index.json
-  git commit -m "Task #$ISSUE_NUM: $COMPONENT_NAME - Initial breakdown"
+  git commit -m "Task #$ISSUE_NUM: $COMPONENT_NAME - Initial breakdown
+
+Node ID: $NODE_ID
+Complexity: $COMPLEXITY/10
+Figma: $FIGMA_LINK"
+
+  echo -e "${GREEN}✓ Committed task files${NC}"
 
   COMPONENT_NUM=$((COMPONENT_NUM + 1))
 done
@@ -161,6 +232,8 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 get_task_stats
 
 echo -e "\n${YELLOW}Next Steps:${NC}"
-echo -e "  1. Review tasks: ${BLUE}list_tasks${NC}"
+echo -e "  1. Review tasks: ${BLUE}cat .claude/tasks/index.json | jq${NC}"
 echo -e "  2. Start implementation: ${BLUE}/implement${NC}"
 echo -e "  3. Or switch to specific task: ${BLUE}/implement <branch-name>${NC}\n"
+
+echo -e "${BLUE}All tasks have been created with Figma node IDs for MCP access${NC}"
