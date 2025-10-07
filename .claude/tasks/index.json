@@ -1,8 +1,9 @@
 {
   "tasks": [
-    "task1.json"
+    "task1.json",
+    "task2.json"
   ],
   "version": "2.0",
-  "lastUpdated": "2025-10-07T03:44:16Z",
+  "lastUpdated": "2025-10-07T03:44:18Z",
   "description": "Task files are now individual JSON files for better visibility. Each task is stored in task1.json, task2.json, etc. This index only lists the filenames."
 }
