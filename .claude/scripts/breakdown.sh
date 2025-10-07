@@ -141,6 +141,35 @@ echo "$FRAMES" | jq -c '.[]' | while IFS= read -r frame; do
   # Create Figma link with node ID
   FIGMA_LINK="$FIGMA_URL&node-id=${NODE_ID//:/-}"
 
+  # Check component size by counting children nodes
+  CHILDREN_COUNT=$(jq --arg nodeid "$NODE_ID" '
+    def count_children:
+      if .children then
+        1 + ([.children[] | count_children] | add // 0)
+      else
+        1
+      end;
+    .. | objects | select(.id == $nodeid) | count_children
+  ' "$FIGMA_JSON" 2>/dev/null || echo "0")
+
+  # Warn if component is too large (>500 nodes likely to exceed MCP token limit)
+  if [ "$CHILDREN_COUNT" -gt 500 ]; then
+    echo -e "${RED}❌ Component too large: $CHILDREN_COUNT nodes${NC}"
+    echo -e "${YELLOW}This will exceed MCP token limits (25000 tokens)${NC}"
+    echo -e "${YELLOW}Please break down '$COMPONENT_NAME' into smaller sub-components in Figma${NC}"
+    echo -e "${YELLOW}Or create separate tasks for child frames manually${NC}"
+    echo ""
+    read -p "Skip this component? (y/N): " skip_large
+    if [ "$skip_large" = "y" ]; then
+      echo -e "${YELLOW}⏭️  Skipped $COMPONENT_NAME${NC}"
+      COMPONENT_NUM=$((COMPONENT_NUM + 1))
+      continue
+    fi
+  elif [ "$CHILDREN_COUNT" -gt 300 ]; then
+    echo -e "${YELLOW}⚠️  Large component: $CHILDREN_COUNT nodes${NC}"
+    echo -e "${YELLOW}May need to be split into sub-components${NC}"
+  fi
+
   # Check complexity threshold
   MAX_COMPLEXITY=$(jq -r '.maxComplexityScore // 7' .claude/config/chunk-rules.json 2>/dev/null || echo "7")
 
@@ -166,8 +195,8 @@ echo "$FRAMES" | jq -c '.[]' | while IFS= read -r frame; do
 
 ## Files
 - \`html/$SLUG.html\`
-- \`css/$SLUG.css\`
-- \`js/$SLUG.js\`
+- \`html/css/$SLUG.css\`
+- \`html/js/$SLUG.js\`
 - \`theme/sections/$SLUG.liquid\`
 - \`tests/$SLUG.spec.js\`
 

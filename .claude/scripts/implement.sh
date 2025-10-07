@@ -193,7 +193,7 @@ fi
 update_task_phase "$TARGET_BRANCH" "html"
 
 # Create output directories
-mkdir -p html css js tests
+mkdir -p html html/css html/js tests
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Phase 2: HTML Implementation${NC}"

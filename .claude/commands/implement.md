@@ -51,7 +51,7 @@ Execute the implement.sh script to start HTML implementation workflow.
 - Log to task file
 
 ### 3. Set Up Environment
-- Create directories: `html/`, `css/`, `js/`, `tests/`
+- Create directories: `html/`, `html/css/`, `html/js/`, `tests/`
 - Set up Playwright config if not exists
 - Install Playwright if needed
 - Initialize package.json if needed
@@ -66,19 +66,23 @@ Script provides structure. Claude will:
    mcp__figma-dev-mode-mcp-server__get_screenshot(figmaLink)
    ```
 
+   **⚠️ IMPORTANT**: If `get_metadata` or `get_code` response exceeds token limits (25000 tokens), this indicates the component was not properly broken down during `/breakdown`. The component is too large and should be split into smaller sub-components. Return to `/breakdown` and create separate tasks for each major section.
+
 2. **Generate HTML** at `html/{slug}.html`:
    - Semantic HTML5 elements
    - BEM class naming
    - Accessibility (ARIA, alt text)
    - No inline styles
+   - Link to CSS: `<link rel="stylesheet" href="css/{slug}.css">`
+   - Link to JS: `<script src="js/{slug}.js"></script>`
 
-3. **Generate CSS** at `css/{slug}.css`:
+3. **Generate CSS** at `html/css/{slug}.css`:
    - BEM naming: `.block__element--modifier`
    - CSS variables for colors/spacing
    - Mobile-first responsive
    - Breakpoints: 768px, 1024px
 
-4. **Generate JS** (if needed) at `js/{slug}.js`:
+4. **Generate JS** (if needed) at `html/js/{slug}.js`:
    - Vanilla JavaScript
    - Progressive enhancement
    - Event delegation
@@ -108,7 +112,7 @@ Script provides structure. Claude will:
 
 9. **Commit Progress**:
    ```bash
-   git add html/ css/ js/ tests/ .claude/tasks/
+   git add html/ tests/ .claude/tasks/
    git commit -m "Task #{N}: HTML implementation complete"
    ```
 
