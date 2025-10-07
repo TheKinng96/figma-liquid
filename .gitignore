@@ -16,6 +16,7 @@ html/tests/*-snapshots/
 assets/
 figma-screenshots/
 figma-data.json
+figma-full-file.json
 FIGMA_MEASUREMENTS.md
 
 # Node modules and dependencies
