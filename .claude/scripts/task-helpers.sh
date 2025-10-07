@@ -234,11 +234,16 @@ list_tasks() {
   echo -e "${BLUE}Tasks${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-  if [ "$status_filter" = "all" ]; then
-    jq -r '.tasks[] | "\(.id). [\(.status)] \(.title) (branch: \(.branch))"' "$INDEX_FILE"
-  else
-    jq -r ".tasks[] | select(.status == \"$status_filter\") | \"\(.id). [\(.status)] \(.title) (branch: \(.branch))\"" "$INDEX_FILE"
-  fi
+  # Read from individual task JSON files
+  for task_file in $TASKS_DIR/task*.json; do
+    if [ -f "$task_file" ]; then
+      if [ "$status_filter" = "all" ]; then
+        jq -r '"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))"' "$task_file"
+      else
+        jq -r "select(.status == \"$status_filter\") | \"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))\"" "$task_file"
+      fi
+    fi
+  done
 
   echo ""
 }

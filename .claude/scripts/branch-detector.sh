@@ -90,29 +90,63 @@ get_changed_files() {
 # Search for task by query (branch name, issue number, or title keyword)
 search_task() {
   local query=$1
+  local result=""
 
-  if [ ! -f .claude/tasks/index.json ]; then
-    echo "Error: Task index not found" >&2
+  if [ ! -d .claude/tasks ]; then
+    echo "Error: Tasks directory not found" >&2
     return 1
   fi
 
   # Try exact branch match first
-  local result=$(jq -r ".tasks[] | select(.branch == \"$query\")" .claude/tasks/index.json 2>/dev/null)
+  for task_file in .claude/tasks/task*.json; do
+    if [ -f "$task_file" ]; then
+      local match=$(jq -r "select(.branch == \"$query\") | ." "$task_file" 2>/dev/null)
+      if [ -n "$match" ] && [ "$match" != "null" ]; then
+        result="$match"
+        break
+      fi
+    fi
+  done
 
   # Try issue number
   if [ -z "$result" ]; then
     local clean_query=$(echo "$query" | sed 's/^#//')
-    result=$(jq -r ".tasks[] | select(.issueNumber == $clean_query)" .claude/tasks/index.json 2>/dev/null)
+    for task_file in .claude/tasks/task*.json; do
+      if [ -f "$task_file" ]; then
+        local match=$(jq -r "select(.issueNumber == $clean_query) | ." "$task_file" 2>/dev/null)
+        if [ -n "$match" ] && [ "$match" != "null" ]; then
+          result="$match"
+          break
+        fi
+      fi
+    done
   fi
 
   # Try partial match on slug
   if [ -z "$result" ]; then
-    result=$(jq -r ".tasks[] | select(.slug | contains(\"$query\"))" .claude/tasks/index.json 2>/dev/null)
+    for task_file in .claude/tasks/task*.json; do
+      if [ -f "$task_file" ]; then
+        local match=$(jq -r "select(.slug | contains(\"$query\")) | ." "$task_file" 2>/dev/null)
+        if [ -n "$match" ] && [ "$match" != "null" ]; then
+          result="$match"
+          break
+        fi
+      fi
+    done
   fi
 
-  # Try partial match on title
+  # Try partial match on title (case insensitive)
   if [ -z "$result" ]; then
-    result=$(jq -r ".tasks[] | select(.title | ascii_downcase | contains(\"${query,,}\"))" .claude/tasks/index.json 2>/dev/null)
+    local query_lower=$(echo "$query" | tr '[:upper:]' '[:lower:]')
+    for task_file in .claude/tasks/task*.json; do
+      if [ -f "$task_file" ]; then
+        local match=$(jq -r "select(.title | ascii_downcase | contains(\"$query_lower\")) | ." "$task_file" 2>/dev/null)
+        if [ -n "$match" ] && [ "$match" != "null" ]; then
+          result="$match"
+          break
+        fi
+      fi
+    done
   fi
 
   echo "$result"
