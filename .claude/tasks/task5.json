@@ -1,13 +1,13 @@
 {
-  "id": "6",
-  "issueNumber": 6,
-  "title": "PC_コレクションテンプレート（ブランド）",
-  "slug": "pc-",
-  "branch": "issue-6-pc-",
-  "nodeId": "111:2524",
-  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD?node-id=111-2524",
-  "complexity": 6,
-  "type": "desktop",
+  "id": "13",
+  "issueNumber": 13,
+  "title": "Frame 1686",
+  "slug": "frame-1686",
+  "branch": "issue-13-frame-1686",
+  "nodeId": "111:854",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/%E3%80%90%E5%AE%8C%E4%BA%86%E3%80%91%E5%90%89%E5%B7%9D%E5%95%86%E4%BA%8B%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE--Copy-?node-id=111-48&p=f&t=k4T5zU6D7Nbj7TcW-0&node-id=111-854",
+  "complexity": 5,
+  "type": "section",
   "status": "pending",
   "phase": "analysis"
 }
