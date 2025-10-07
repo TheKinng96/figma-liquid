@@ -18,7 +18,14 @@ init_tasks() {
   mkdir -p "$TASKS_DIR"
 
   if [ ! -f "$INDEX_FILE" ]; then
-    echo '{"tasks":[]}' > "$INDEX_FILE"
+    cat > "$INDEX_FILE" << 'EOF'
+{
+  "tasks": [],
+  "version": "2.0",
+  "lastUpdated": "",
+  "description": "Task files are now individual JSON files for better visibility. Each task is stored in task1.json, task2.json, etc. This index only lists the filenames."
+}
+EOF
     echo -e "${GREEN}✓ Task index created${NC}"
   fi
 }
