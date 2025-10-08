@@ -152,82 +152,122 @@ echo "$FRAMES" | jq -c '.[]' | while IFS= read -r frame; do
     .. | objects | select(.id == $nodeid) | count_children
   ' "$FIGMA_JSON" 2>/dev/null || echo "0")
 
-  # Warn if component is too large (>500 nodes likely to exceed MCP token limit)
-  if [ "$CHILDREN_COUNT" -gt 500 ]; then
-    echo -e "${RED}❌ Component too large: $CHILDREN_COUNT nodes${NC}"
-    echo -e "${YELLOW}This will exceed MCP token limits (25000 tokens)${NC}"
-    echo ""
-    echo -e "${YELLOW}Options:${NC}"
-    echo "  (s) Skip - manually split in Figma later"
-    echo "  (a) Auto-split - create tasks for child frames (preserves order)"
-    echo "  (c) Continue anyway - create task (will fail during /implement)"
-    echo ""
-    read -p "Choose (s/a/c): " split_choice
+  # Recursive function to split component if too large
+  split_if_needed() {
+    local node_id=$1
+    local comp_name=$2
+    local parent_slug=$3
+    local parent_name=${4:-""}
+    local depth=${5:-0}
 
-    case $split_choice in
-      s)
-        echo -e "${YELLOW}⏭️  Skipped $COMPONENT_NAME${NC}"
-        COMPONENT_NUM=$((COMPONENT_NUM + 1))
-        continue
-        ;;
-      a)
-        echo -e "${BLUE}Auto-splitting $COMPONENT_NAME into child components...${NC}"
+    local indent=""
+    for ((i=0; i<depth; i++)); do indent="  $indent"; done
 
-        # Extract direct children frames, sorted by Y position (top to bottom)
-        CHILD_FRAMES=$(jq --arg nodeid "$NODE_ID" '
-          .. | objects | select(.id == $nodeid) |
-          .children[]? |
-          select(.type == "FRAME" or .type == "GROUP") |
-          {
-            nodeId: .id,
-            name: .name,
-            type: .type,
-            y: (.absoluteBoundingBox.y // 0)
-          }
-        ' "$FIGMA_JSON" | jq -s 'sort_by(.y)')
+    # Count nodes
+    local node_count=$(jq --arg nodeid "$node_id" '
+      def count_children:
+        if .children then 1 + ([.children[] | count_children] | add // 0)
+        else 1 end;
+      .. | objects | select(.id == $nodeid) | count_children
+    ' "$FIGMA_JSON" 2>/dev/null || echo "0")
 
-        CHILD_COUNT=$(echo "$CHILD_FRAMES" | jq 'length')
+    # Check if component is too large
+    if [ "$node_count" -gt 500 ]; then
+      echo -e "${indent}${RED}❌ $comp_name: $node_count nodes (exceeds 500 limit)${NC}"
+      echo -e "${indent}${YELLOW}Auto-splitting into child components...${NC}"
 
-        if [ "$CHILD_COUNT" -eq 0 ]; then
-          echo -e "${RED}No child frames found to split${NC}"
-          read -p "Continue with original component anyway? (y/N): " continue_orig
-          if [ "$continue_orig" != "y" ]; then
-            COMPONENT_NUM=$((COMPONENT_NUM + 1))
-            continue
-          fi
+      # Extract child frames sorted by Y position
+      local children=$(jq --arg nodeid "$node_id" '
+        .. | objects | select(.id == $nodeid) |
+        .children[]? |
+        select(.type == "FRAME" or .type == "GROUP" or .type == "SECTION") |
+        {nodeId: .id, name: .name, type: .type, y: (.absoluteBoundingBox.y // 0)}
+      ' "$FIGMA_JSON" | jq -s 'sort_by(.y)')
+
+      local child_count=$(echo "$children" | jq 'length')
+
+      if [ "$child_count" -eq 0 ]; then
+        echo -e "${indent}${RED}No child frames found to split${NC}"
+        echo -e "${indent}${YELLOW}Component too large but cannot be auto-split - SKIPPING${NC}"
+        return 1
+      fi
+
+      echo -e "${indent}${GREEN}Found $child_count child sections${NC}"
+      echo "$children" | jq -r --arg indent "$indent" '.[] | "\($indent)  - \(.name) (node: \(.nodeId))"'
+
+      # Process each child
+      local child_num=1
+      echo "$children" | jq -c '.[]' | while read -r child; do
+        local child_node_id=$(echo "$child" | jq -r '.nodeId')
+        local child_name=$(echo "$child" | jq -r '.name')
+        local child_slug="${parent_slug}-${child_num}"
+        local child_title="${comp_name}_${child_name}"
+
+        # Recursively check if child is also too large
+        if ! split_if_needed "$child_node_id" "$child_name" "$child_slug" "$comp_name" $((depth + 1)); then
+          # Child was too large and couldn't be split - create task anyway with warning
+          create_task_for_component "$child_node_id" "$child_title" "$child_slug" "$comp_name" "$child_num" "$child_count" "true"
         else
-          echo -e "${GREEN}Found $CHILD_COUNT child sections (ordered top to bottom)${NC}"
-          echo "$CHILD_FRAMES" | jq -r '.[] | "  - \(.name) (node: \(.nodeId))"'
-          echo ""
+          # Child is safe size - create task
+          create_task_for_component "$child_node_id" "$child_title" "$child_slug" "$comp_name" "$child_num" "$child_count" "false"
+        fi
 
-          # Process each child as a separate task
-          CHILD_NUM=1
-          echo "$CHILD_FRAMES" | jq -c '.[]' | while read -r child; do
-            CHILD_NODE_ID=$(echo "$child" | jq -r '.nodeId')
-            CHILD_NAME=$(echo "$child" | jq -r '.name')
-            CHILD_SLUG="${SLUG}-section-${CHILD_NUM}"
-            CHILD_TITLE="${COMPONENT_NAME}_${CHILD_NAME}"
-            CHILD_FIGMA_LINK="$FIGMA_URL&node-id=${CHILD_NODE_ID//:/-}"
+        child_num=$((child_num + 1))
+      done
 
-            # Count nodes in child
-            CHILD_NODES=$(jq --arg nodeid "$CHILD_NODE_ID" '
-              def count_children:
-                if .children then 1 + ([.children[] | count_children] | add // 0)
-                else 1 end;
-              .. | objects | select(.id == $nodeid) | count_children
-            ' "$FIGMA_JSON" 2>/dev/null || echo "0")
+      return 1  # Indicate parent was split
+    else
+      echo -e "${indent}${GREEN}✓ $comp_name: $node_count nodes (safe)${NC}"
+      return 0  # Indicate component is safe
+    fi
+  }
 
-            echo -e "${BLUE}Creating task for: $CHILD_TITLE ($CHILD_NODES nodes)${NC}"
+  # Helper to create task for a component
+  create_task_for_component() {
+    local node_id=$1
+    local title=$2
+    local slug=$3
+    local parent_name=${4:-""}
+    local section_num=${5:-""}
+    local section_total=${6:-""}
+    local is_oversized=${7:-"false"}
 
-            # Create issue and task (reuse existing logic below)
-            ISSUE_BODY="**Figma Link**: $CHILD_FIGMA_LINK
-**Parent Component**: $COMPONENT_NAME
-**Section**: $CHILD_NUM of $CHILD_COUNT
+    local figma_link="$FIGMA_URL&node-id=${node_id//:/-}"
+
+    # Count nodes
+    local node_count=$(jq --arg nodeid "$node_id" '
+      def count_children:
+        if .children then 1 + ([.children[] | count_children] | add // 0)
+        else 1 end;
+      .. | objects | select(.id == $nodeid) | count_children
+    ' "$FIGMA_JSON" 2>/dev/null || echo "0")
+
+    local complexity=5
+    if [ "$is_oversized" = "true" ]; then
+      complexity=8
+    fi
+
+    # Build issue body
+    local issue_body="**Figma Link**: $figma_link
+**Node Count**: $node_count nodes"
+
+    if [ -n "$parent_name" ] && [ -n "$section_num" ]; then
+      issue_body="$issue_body
+**Parent Component**: $parent_name
+**Section**: $section_num of $section_total"
+    fi
+
+    if [ "$is_oversized" = "true" ]; then
+      issue_body="$issue_body
+
+⚠️ **Warning**: This component has $node_count nodes and may exceed MCP token limits."
+    fi
+
+    issue_body="$issue_body
 
 ## Component Details
-- Node ID: \`$CHILD_NODE_ID\`
-- Node Count: $CHILD_NODES
-- Complexity: 5/10 (auto-split section)
+- Node ID: \`$node_id\`
+- Complexity: $complexity/10
 - Type: Section
 
 ## Tasks
@@ -238,82 +278,85 @@ echo "$FRAMES" | jq -c '.[]' | while IFS= read -r frame; do
 - [ ] All tests passing
 
 ## Files
-- \`html/$CHILD_SLUG.html\`
-- \`html/css/$CHILD_SLUG.css\`
-- \`html/js/$CHILD_SLUG.js\`
-- \`theme/sections/$CHILD_SLUG.liquid\`
-- \`tests/$CHILD_SLUG.spec.js\`
+- \`html/$slug.html\`
+- \`html/css/$slug.css\`
+- \`html/js/$slug.js\`
+- \`theme/sections/$slug.liquid\`
+- \`tests/$slug.spec.js\`
 
 ## MCP Access
-This task will use Figma MCP to access node \`$CHILD_NODE_ID\`
+This task will use Figma MCP to access node \`$node_id\`
 
 ---
 Generated by /breakdown (auto-split)"
 
-            CHILD_ISSUE_URL=$(gh issue create \
-              --title "Implement $CHILD_TITLE" \
-              --body "$ISSUE_BODY" \
-              --label "figma-conversion,priority-medium,phase-core,auto-split")
+    local labels="figma-conversion,priority-medium,phase-core,auto-split"
+    if [ "$is_oversized" = "true" ]; then
+      labels="$labels,needs-splitting"
+    fi
 
-            CHILD_ISSUE_NUM=$(echo "$CHILD_ISSUE_URL" | grep -oE '[0-9]+$')
-            echo -e "${GREEN}✓ Created issue #$CHILD_ISSUE_NUM${NC}"
+    local issue_url=$(gh issue create \
+      --title "Implement $title" \
+      --body "$issue_body" \
+      --label "$labels")
 
-            CHILD_BRANCH="issue-$CHILD_ISSUE_NUM-$CHILD_SLUG"
-            git checkout -b "$CHILD_BRANCH" 2>/dev/null || git checkout "$CHILD_BRANCH"
+    local issue_num=$(echo "$issue_url" | grep -oE '[0-9]+$')
+    echo -e "${GREEN}✓ Created issue #$issue_num: $title${NC}"
 
-            CHILD_TASK_FILE=$(create_task_file "$CHILD_ISSUE_NUM" "$CHILD_TITLE" "$CHILD_SLUG" "$CHILD_FIGMA_LINK" 5)
-            echo -e "\n## Figma Node ID\n\`$CHILD_NODE_ID\`\n" >> "$CHILD_TASK_FILE"
+    local branch="issue-$issue_num-$slug"
+    git checkout -b "$branch" 2>/dev/null || git checkout "$branch"
 
-            CHILD_TASK_JSON=".claude/tasks/task${COMPONENT_NUM}.json"
-            cat > "$CHILD_TASK_JSON" << EOF
+    local task_file=$(create_task_file "$issue_num" "$title" "$slug" "$figma_link" "$complexity")
+    echo -e "\n## Figma Node ID\n\`$node_id\`\n" >> "$task_file"
+
+    local task_json=".claude/tasks/task${COMPONENT_NUM}.json"
+    cat > "$task_json" << EOF
 {
-  "id": "$CHILD_ISSUE_NUM",
-  "issueNumber": $CHILD_ISSUE_NUM,
-  "title": "$CHILD_TITLE",
-  "slug": "$CHILD_SLUG",
-  "branch": "$CHILD_BRANCH",
-  "nodeId": "$CHILD_NODE_ID",
-  "figmaLink": "$CHILD_FIGMA_LINK",
-  "complexity": 5,
+  "id": "$issue_num",
+  "issueNumber": $issue_num,
+  "title": "$title",
+  "slug": "$slug",
+  "branch": "$branch",
+  "nodeId": "$node_id",
+  "figmaLink": "$figma_link",
+  "complexity": $complexity,
+  "nodeCount": $node_count,
   "type": "section",
-  "parentComponent": "$COMPONENT_NAME",
-  "sectionNumber": $CHILD_NUM,
+  "parentComponent": "$parent_name",
+  "sectionNumber": $section_num,
+  "isOversized": $is_oversized,
   "status": "pending",
   "phase": "analysis"
 }
 EOF
 
-            TASK_FILES=$(ls .claude/tasks/task*.json 2>/dev/null | xargs -n1 basename | jq -R . | jq -s .)
-            jq ".tasks = $TASK_FILES | .lastUpdated = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"" \
-              .claude/tasks/index.json > .claude/tasks/index.json.tmp && \
-              mv .claude/tasks/index.json.tmp .claude/tasks/index.json
+    TASK_FILES=$(ls .claude/tasks/task*.json 2>/dev/null | xargs -n1 basename | jq -R . | jq -s .)
+    jq ".tasks = $TASK_FILES | .lastUpdated = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"" \
+      .claude/tasks/index.json > .claude/tasks/index.json.tmp && \
+      mv .claude/tasks/index.json.tmp .claude/tasks/index.json
 
-            git add "$CHILD_TASK_FILE" "$CHILD_TASK_JSON" .claude/tasks/index.json
-            git commit -m "Task #$CHILD_ISSUE_NUM: $CHILD_TITLE - Auto-split section $CHILD_NUM/$CHILD_COUNT"
+    git add "$task_file" "$task_json" .claude/tasks/index.json
+    git commit -m "Task #$issue_num: $title - Auto-split section
 
-            echo -e "${GREEN}✓ Created task $COMPONENT_NUM${NC}\n"
+Node ID: $node_id
+Node Count: $node_count
+Figma: $figma_link"
 
-            COMPONENT_NUM=$((COMPONENT_NUM + 1))
-            CHILD_NUM=$((CHILD_NUM + 1))
-          done
+    echo -e "${GREEN}✓ Task $COMPONENT_NUM complete${NC}\n"
+    COMPONENT_NUM=$((COMPONENT_NUM + 1))
+  }
 
-          # Skip the parent component since we created child tasks
-          continue
-        fi
-        ;;
-      c)
-        echo -e "${YELLOW}⚠️  Continuing with large component${NC}"
-        echo -e "${YELLOW}This will likely fail during /implement${NC}"
-        ;;
-      *)
-        echo -e "${RED}Invalid choice, skipping component${NC}"
-        COMPONENT_NUM=$((COMPONENT_NUM + 1))
-        continue
-        ;;
-    esac
-  elif [ "$CHILDREN_COUNT" -gt 300 ]; then
+  # Check component size and auto-split if needed
+  echo -e "${BLUE}Validating component size...${NC}"
+  if ! split_if_needed "$NODE_ID" "$COMPONENT_NAME" "$SLUG" "" 0; then
+    echo -e "${GREEN}✓ Component split into sub-components${NC}"
+    continue  # Skip creating task for parent
+  fi
+
+  # Component is safe size - check other thresholds
+  if [ "$CHILDREN_COUNT" -gt 300 ]; then
     echo -e "${YELLOW}⚠️  Large component: $CHILDREN_COUNT nodes${NC}"
-    echo -e "${YELLOW}May need to be split into sub-components${NC}"
+    echo -e "${YELLOW}May need manual splitting if issues occur${NC}"
   fi
 
   # Check complexity threshold
@@ -425,7 +468,26 @@ echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}Breakdown Complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# Show summary
+# Show component size summary
+echo -e "${BLUE}Component Size Validation Summary:${NC}\n"
+
+SAFE_TASKS=$(cat .claude/tasks/task*.json 2>/dev/null | jq -s '[.[] | select(.nodeCount <= 300)] | length')
+WARNING_TASKS=$(cat .claude/tasks/task*.json 2>/dev/null | jq -s '[.[] | select(.nodeCount > 300 and .nodeCount <= 500)] | length')
+OVERSIZED_TASKS=$(cat .claude/tasks/task*.json 2>/dev/null | jq -s '[.[] | select(.isOversized == "true")] | length')
+
+echo -e "${GREEN}✅ Safe components (<300 nodes): $SAFE_TASKS${NC}"
+if [ "$WARNING_TASKS" -gt 0 ]; then
+  echo -e "${YELLOW}⚠️  Warning - Near limit (300-500 nodes): $WARNING_TASKS${NC}"
+  cat .claude/tasks/task*.json 2>/dev/null | jq -s -r '.[] | select(.nodeCount > 300 and .nodeCount <= 500) | "  - \(.title): \(.nodeCount) nodes"'
+fi
+if [ "$OVERSIZED_TASKS" -gt 0 ]; then
+  echo -e "${RED}❌ Oversized (>500 nodes, may fail): $OVERSIZED_TASKS${NC}"
+  cat .claude/tasks/task*.json 2>/dev/null | jq -s -r '.[] | select(.isOversized == "true") | "  - \(.title): \(.nodeCount) nodes (needs manual review)"'
+fi
+
+echo ""
+
+# Show task stats
 get_task_stats
 
 echo -e "\n${YELLOW}Next Steps:${NC}"
