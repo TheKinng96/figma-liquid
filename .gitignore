@@ -3,3 +3,16 @@
 
 # Claude agent data
 .claude/data/
+
+# Node modules and dependencies
+node_modules
+package-lock.json
+
+# Test results and artifacts
+test-results/
+playwright-report/
+.playwright/
+
+# Build artifacts
+dist/
+build/
