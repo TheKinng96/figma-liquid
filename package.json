@@ -1,0 +1,27 @@
+{
+  "name": "figma-liquid",
+  "version": "1.0.0",
+  "description": "Automated workflow for converting Figma designs to Shopify Liquid themes using Claude AI with MCP (Model Context Protocol) and Playwright testing.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheKinng96/figma-liquid.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TheKinng96/figma-liquid/issues"
+  },
+  "homepage": "https://github.com/TheKinng96/figma-liquid#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}
