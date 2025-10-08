@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Combined Implementation Script
-# Implements multiple sections into a single HTML file
+# Automatically implements multiple sections into a single HTML file
 
 set -e
 
@@ -14,143 +14,248 @@ PURPLE='\033[0;35m'
 NC='\033[0m'
 
 # Load utilities
-source "$(dirname "$0")/figma-utils.sh"
+source "$(dirname "$0")/figma-utils.sh" 2>/dev/null || true
 
-echo -e "${PURPLE}⚡ Figma to Liquid - Combined Implementation${NC}\n"
+echo -e "${PURPLE}⚡ Figma to Liquid - Auto Combined Implementation${NC}\n"
 
-# Get parent component name from argument or detect from branch
+# Function to find next parent component to implement
+find_next_parent() {
+  # Check if index.json exists
+  if [ ! -f .claude/tasks/index.json ]; then
+    echo -e "${RED}❌ No tasks found. Run /breakdown first.${NC}" >&2
+    exit 1
+  fi
+
+  # Get all task files
+  local task_files=$(jq -r '.tasks[]' .claude/tasks/index.json)
+
+  if [ -z "$task_files" ]; then
+    echo -e "${RED}❌ No tasks found in index.${NC}" >&2
+    exit 1
+  fi
+
+  # Group tasks by parent component and find first pending/in-progress
+  local parent=""
+  for task_file in $task_files; do
+    local task_data=$(cat ".claude/tasks/$task_file")
+    local status=$(echo "$task_data" | jq -r '.status')
+    local parent_component=$(echo "$task_data" | jq -r '.parentComponent')
+    local is_auto_split=$(echo "$task_data" | jq -r '.isAutoSplit')
+
+    # Skip completed tasks
+    if [ "$status" = "completed" ]; then
+      continue
+    fi
+
+    # If this is an auto-split task, use parent component
+    if [ "$is_auto_split" = "true" ] && [ -n "$parent_component" ]; then
+      parent=$parent_component
+      break
+    fi
+
+    # Otherwise use the task title as parent
+    if [ -z "$parent" ]; then
+      parent=$(echo "$task_data" | jq -r '.title')
+      break
+    fi
+  done
+
+  if [ -z "$parent" ]; then
+    echo -e "${YELLOW}⚠️  All tasks completed!${NC}" >&2
+    exit 0
+  fi
+
+  # Convert parent to slug format
+  echo "$parent" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+# Get parent component from argument or auto-detect
 PARENT_SLUG=$1
 
 if [ -z "$PARENT_SLUG" ]; then
-  # Try to detect from branch name (e.g., issue-X-pc-top-1 -> pc-top)
-  CURRENT_BRANCH=$(git branch --show-current)
-  if [[ "$CURRENT_BRANCH" =~ issue-[0-9]+-(.+)-[0-9]+ ]]; then
-    PARENT_SLUG="${BASH_REMATCH[1]}"
-  else
-    echo -e "${RED}❌ Cannot detect parent component${NC}"
-    echo -e "${YELLOW}Usage: $0 <parent-slug>${NC}"
-    echo -e "${YELLOW}Example: $0 pc-top${NC}"
-    exit 1
-  fi
+  echo -e "${BLUE}Auto-detecting next component to implement...${NC}\n"
+  PARENT_SLUG=$(find_next_parent)
+  echo -e "${GREEN}✓ Selected: $PARENT_SLUG${NC}\n"
 fi
 
 echo -e "${BLUE}Parent Component:${NC} $PARENT_SLUG\n"
 
-# Find all task branches for this parent
-TASK_BRANCHES=$(git branch | grep "issue-.*-${PARENT_SLUG}-[0-9]" | sed 's/^[* ]*//' | sort)
-
-if [ -z "$TASK_BRANCHES" ]; then
-  echo -e "${RED}❌ No task branches found for $PARENT_SLUG${NC}"
+# Find all related task files
+if [ ! -f .claude/tasks/index.json ]; then
+  echo -e "${RED}❌ No tasks found. Run /breakdown first.${NC}"
   exit 1
 fi
 
-BRANCH_COUNT=$(echo "$TASK_BRANCHES" | wc -l | tr -d ' ')
-echo -e "${GREEN}Found $BRANCH_COUNT sections to combine${NC}\n"
+# Get all task files and filter by parent
+TASK_FILES=$(jq -r '.tasks[]' .claude/tasks/index.json)
+MATCHING_TASKS=""
+
+for task_file in $TASK_FILES; do
+  task_data=$(cat ".claude/tasks/$task_file")
+  slug=$(echo "$task_data" | jq -r '.slug')
+  parent=$(echo "$task_data" | jq -r '.parentComponent')
+  is_auto_split=$(echo "$task_data" | jq -r '.isAutoSplit')
+
+  # Match by slug pattern or parent component
+  if [[ "$slug" == "$PARENT_SLUG"* ]] || [ "$parent" = "$PARENT_SLUG" ]; then
+    MATCHING_TASKS="$MATCHING_TASKS $task_file"
+  fi
+done
+
+if [ -z "$MATCHING_TASKS" ]; then
+  echo -e "${RED}❌ No tasks found for parent: $PARENT_SLUG${NC}"
+  echo -e "${YELLOW}Available parents:${NC}"
+  for task_file in $TASK_FILES; do
+    task_data=$(cat ".claude/tasks/$task_file")
+    parent=$(echo "$task_data" | jq -r '.parentComponent // .title')
+    echo "  - $parent"
+  done | sort -u
+  exit 1
+fi
+
+TASK_COUNT=$(echo "$MATCHING_TASKS" | wc -w | tr -d ' ')
+echo -e "${GREEN}Found $TASK_COUNT sections to combine${NC}\n"
+
+# Sort tasks by section number
+SORTED_TASKS=$(for task_file in $MATCHING_TASKS; do
+  task_data=$(cat ".claude/tasks/$task_file")
+  section_num=$(echo "$task_data" | jq -r '.sectionNumber // 0')
+  echo "$section_num:$task_file"
+done | sort -n | cut -d':' -f2)
 
 # Output files
+mkdir -p html html/css html/js tests
 COMBINED_HTML="html/${PARENT_SLUG}.html"
 COMBINED_CSS="html/css/${PARENT_SLUG}.css"
 COMBINED_JS="html/js/${PARENT_SLUG}.js"
+COMBINED_TEST="tests/${PARENT_SLUG}.spec.js"
 
-# Initialize combined files
-cat > "$COMBINED_HTML" << 'EOF'
+echo -e "${BLUE}Creating combined files...${NC}"
+
+# Initialize combined HTML
+cat > "$COMBINED_HTML" << EOF
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PARENT_TITLE</title>
-  <link rel="stylesheet" href="css/PARENT_SLUG.css">
+  <title>${PARENT_SLUG}</title>
+  <link rel="stylesheet" href="css/${PARENT_SLUG}.css">
 </head>
 <body>
-  <main class="PARENT_SLUG">
+  <main class="${PARENT_SLUG}">
 EOF
 
-# Replace placeholders
-sed -i '' "s/PARENT_TITLE/${PARENT_SLUG}/g" "$COMBINED_HTML"
-sed -i '' "s/PARENT_SLUG/${PARENT_SLUG}/g" "$COMBINED_HTML"
+# Initialize CSS
+cat > "$COMBINED_CSS" << EOF
+/* Combined CSS for $PARENT_SLUG */
+/* Auto-generated by /implement-combined */
 
-# Initialize CSS and JS
-echo "/* Combined CSS for $PARENT_SLUG */" > "$COMBINED_CSS"
-echo "" >> "$COMBINED_CSS"
+.${PARENT_SLUG} {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
 
-echo "/* Combined JavaScript for $PARENT_SLUG */" > "$COMBINED_JS"
-echo "(function() {" >> "$COMBINED_JS"
-echo "  'use strict';" >> "$COMBINED_JS"
-echo "" >> "$COMBINED_JS"
+EOF
+
+# Initialize JS
+cat > "$COMBINED_JS" << EOF
+/* Combined JavaScript for $PARENT_SLUG */
+/* Auto-generated by /implement-combined */
+(function() {
+  'use strict';
+
+EOF
 
 # Process each section in order
 SECTION_NUM=1
-echo "$TASK_BRANCHES" | while read -r branch; do
-  echo -e "${BLUE}Processing section $SECTION_NUM: $branch${NC}"
+for task_file in $SORTED_TASKS; do
+  echo -e "${BLUE}  Processing section $SECTION_NUM...${NC}"
 
-  # Get task JSON from this branch
-  TASK_JSON=$(git show "${branch}:.claude/tasks/task${SECTION_NUM}.json" 2>/dev/null || echo "{}")
+  task_data=$(cat ".claude/tasks/$task_file")
 
-  if [ "$TASK_JSON" = "{}" ]; then
-    echo -e "${YELLOW}  ⚠️  No task JSON found, searching...${NC}"
-    # Try to find task JSON by branch name
-    TASK_JSON=$(git show "${branch}:.claude/tasks/" | grep "\.json$" | head -1)
-  fi
+  NODE_ID=$(echo "$task_data" | jq -r '.nodeId')
+  SECTION_SLUG=$(echo "$task_data" | jq -r '.slug')
+  SECTION_TITLE=$(echo "$task_data" | jq -r '.title')
+  PARENT_COMPONENT=$(echo "$task_data" | jq -r '.parentComponent')
 
-  NODE_ID=$(echo "$TASK_JSON" | jq -r '.nodeId // empty')
-  SECTION_SLUG=$(echo "$TASK_JSON" | jq -r '.slug // empty')
-
-  if [ -z "$NODE_ID" ]; then
-    echo -e "${YELLOW}  ⚠️  Skipping - no node ID${NC}"
-    SECTION_NUM=$((SECTION_NUM + 1))
+  if [ -z "$NODE_ID" ] || [ "$NODE_ID" = "null" ]; then
+    echo -e "${YELLOW}    ⚠️  Skipping - no node ID${NC}"
     continue
   fi
 
-  echo -e "  ${GREEN}Node ID: $NODE_ID${NC}"
+  echo -e "    ${GREEN}Node: $NODE_ID - $SECTION_TITLE${NC}"
 
-  # Get component metadata
-  METADATA=$(get_component_metadata "$NODE_ID")
-  CONTAINER_SPEC=$(get_container_spec "$NODE_ID")
-
-  NEEDS_CONTAINER=$(echo "$CONTAINER_SPEC" | jq -r '.needsContainer')
-  FRAME_WIDTH=$(echo "$CONTAINER_SPEC" | jq -r '.width')
-
-  # Generate section HTML
-  echo "" >> "$COMBINED_HTML"
-  echo "    <!-- Section $SECTION_NUM: $SECTION_SLUG -->" >> "$COMBINED_HTML"
-
-  if [ "$NEEDS_CONTAINER" = "true" ]; then
-    echo "    <section class=\"${PARENT_SLUG}__section\" data-section=\"$SECTION_NUM\">" >> "$COMBINED_HTML"
-    echo "      <div class=\"${PARENT_SLUG}__container\" style=\"max-width: ${FRAME_WIDTH}px;\">" >> "$COMBINED_HTML"
-    echo "        <!-- Section content will be implemented here -->" >> "$COMBINED_HTML"
-    echo "        <div id=\"section-${SECTION_NUM}-placeholder\"></div>" >> "$COMBINED_HTML"
-    echo "      </div>" >> "$COMBINED_HTML"
-    echo "    </section>" >> "$COMBINED_HTML"
-  else
-    echo "    <section class=\"${PARENT_SLUG}__section\" data-section=\"$SECTION_NUM\" style=\"max-width: ${FRAME_WIDTH}px;\">" >> "$COMBINED_HTML"
-    echo "      <!-- Section content will be implemented here -->" >> "$COMBINED_HTML"
-    echo "      <div id=\"section-${SECTION_NUM}-placeholder\"></div>" >> "$COMBINED_HTML"
-    echo "    </section>" >> "$COMBINED_HTML"
+  # Get frame width from Figma file (if available)
+  FRAME_WIDTH=1440
+  if [ -f logs/figma-full-file.json ]; then
+    FRAME_WIDTH=$(jq -r --arg nid "$NODE_ID" '
+      [.. | objects | select(.id == $nid)] | .[0] |
+      .absoluteBoundingBox.width // 1440
+    ' logs/figma-full-file.json 2>/dev/null || echo "1440")
   fi
 
-  # Add section comment to CSS
-  echo "" >> "$COMBINED_CSS"
-  echo "/* =============================================" >> "$COMBINED_CSS"
-  echo "   Section $SECTION_NUM: $SECTION_SLUG" >> "$COMBINED_CSS"
-  echo "   Node ID: $NODE_ID" >> "$COMBINED_CSS"
-  echo "   ============================================= */" >> "$COMBINED_CSS"
-  echo "" >> "$COMBINED_CSS"
+  # Determine if container is needed (simple heuristic: width < 1400 = needs container)
+  NEEDS_CONTAINER="false"
+  if [ $(echo "$FRAME_WIDTH < 1400" | bc -l) -eq 1 ]; then
+    NEEDS_CONTAINER="true"
+  fi
 
-  # Add base section styles
+  # Generate section HTML
+  cat >> "$COMBINED_HTML" << EOF
+
+    <!-- Section $SECTION_NUM: $SECTION_TITLE -->
+    <!-- Node ID: $NODE_ID -->
+    <section class="${PARENT_SLUG}__section" data-section="$SECTION_NUM" data-node-id="$NODE_ID">
+EOF
+
+  if [ "$NEEDS_CONTAINER" = "true" ]; then
+    cat >> "$COMBINED_HTML" << EOF
+      <div class="${PARENT_SLUG}__container" style="max-width: ${FRAME_WIDTH}px;">
+        <!-- TODO: Implement $SECTION_TITLE -->
+        <div class="section-placeholder">
+          <p>Section $SECTION_NUM: $SECTION_TITLE</p>
+          <p>Node ID: $NODE_ID</p>
+        </div>
+      </div>
+EOF
+  else
+    cat >> "$COMBINED_HTML" << EOF
+      <!-- TODO: Implement $SECTION_TITLE -->
+      <div class="section-placeholder" style="max-width: ${FRAME_WIDTH}px;">
+        <p>Section $SECTION_NUM: $SECTION_TITLE</p>
+        <p>Node ID: $NODE_ID</p>
+      </div>
+EOF
+  fi
+
+  cat >> "$COMBINED_HTML" << EOF
+    </section>
+EOF
+
+  # Add section CSS
   cat >> "$COMBINED_CSS" << EOF
+
+/* =============================================
+   Section $SECTION_NUM: $SECTION_TITLE
+   Node ID: $NODE_ID
+   Parent: $PARENT_COMPONENT
+   ============================================= */
+
 .${PARENT_SLUG}__section[data-section="$SECTION_NUM"] {
   width: 100%;
-  max-width: ${FRAME_WIDTH}px;
   margin: 0 auto;
+  max-width: ${FRAME_WIDTH}px;
 }
 
 EOF
 
   if [ "$NEEDS_CONTAINER" = "true" ]; then
     cat >> "$COMBINED_CSS" << EOF
-.${PARENT_SLUG}__container {
+.${PARENT_SLUG}__section[data-section="$SECTION_NUM"] .${PARENT_SLUG}__container {
   width: 100%;
+  max-width: ${FRAME_WIDTH}px;
   margin: 0 auto;
   padding: 0 16px;
   box-sizing: border-box;
@@ -159,9 +264,21 @@ EOF
 EOF
   fi
 
-  # Add section initialization to JS
+  # Add placeholder styles
+  cat >> "$COMBINED_CSS" << EOF
+.${PARENT_SLUG}__section[data-section="$SECTION_NUM"] .section-placeholder {
+  padding: 40px;
+  background: #f0f0f0;
+  border: 2px dashed #ccc;
+  text-align: center;
+  color: #666;
+}
+
+EOF
+
+  # Add section JS
   cat >> "$COMBINED_JS" << EOF
-  // Section $SECTION_NUM: $SECTION_SLUG
+  // Section $SECTION_NUM: $SECTION_TITLE (Node: $NODE_ID)
   function initSection${SECTION_NUM}() {
     const section = document.querySelector('[data-section="$SECTION_NUM"]');
     if (!section) {
@@ -169,54 +286,121 @@ EOF
       return;
     }
 
-    // Section-specific initialization
-    console.log('Section $SECTION_NUM initialized');
+    // TODO: Add section-specific initialization
+    console.log('Section $SECTION_NUM initialized:', section);
   }
 
 EOF
+
+  # Update task status to in_progress
+  jq '.status = "in_progress" | .phase = "implementation" | .updated = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
+    ".claude/tasks/$task_file" > ".claude/tasks/$task_file.tmp"
+  mv ".claude/tasks/$task_file.tmp" ".claude/tasks/$task_file"
 
   SECTION_NUM=$((SECTION_NUM + 1))
 done
 
 # Close HTML
-cat >> "$COMBINED_HTML" << 'EOF'
-  </main>
+cat >> "$COMBINED_HTML" << EOF
 
-  <script src="js/PARENT_SLUG.js"></script>
+  </main>
+  <script src="js/${PARENT_SLUG}.js"></script>
 </body>
 </html>
 EOF
 
-sed -i '' "s/PARENT_SLUG/${PARENT_SLUG}/g" "$COMBINED_HTML"
+# Close JS with auto-initialization
+cat >> "$COMBINED_JS" << EOF
 
-# Close JS
-cat >> "$COMBINED_JS" << 'EOF'
-  // Initialize all sections
+  // Auto-initialize all sections on DOM ready
   document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing ${PARENT_SLUG}...');
+
     const sections = document.querySelectorAll('[data-section]');
-    sections.forEach((section, index) => {
-      const sectionNum = index + 1;
+    console.log('Found ' + sections.length + ' sections');
+
+    sections.forEach(function(section) {
+      const sectionNum = section.getAttribute('data-section');
       const initFn = window['initSection' + sectionNum];
-      if (initFn) initFn();
+
+      if (typeof initFn === 'function') {
+        initFn();
+      }
     });
+
+    console.log('${PARENT_SLUG} initialized');
   });
 
 })();
 EOF
 
+# Create basic Playwright test
+cat > "$COMBINED_TEST" << EOF
+const { test, expect } = require('@playwright/test');
+
+test.describe('${PARENT_SLUG}', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('file://' + process.cwd() + '/html/${PARENT_SLUG}.html');
+  });
+
+  test('should load all sections', async ({ page }) => {
+    const sections = await page.locator('[data-section]').count();
+    expect(sections).toBe(${SECTION_NUM} - 1);
+  });
+
+  test('should have correct title', async ({ page }) => {
+    await expect(page).toHaveTitle('${PARENT_SLUG}');
+  });
+
+  test('should initialize JavaScript', async ({ page }) => {
+    const logs = [];
+    page.on('console', msg => logs.push(msg.text()));
+
+    await page.waitForLoadState('networkidle');
+
+    expect(logs.some(log => log.includes('${PARENT_SLUG} initialized'))).toBe(true);
+  });
+
+  // TODO: Add visual regression tests
+  // test('should match screenshot', async ({ page }) => {
+  //   await expect(page).toHaveScreenshot('${PARENT_SLUG}.png');
+  // });
+});
+EOF
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}Combined Implementation Complete!${NC}"
+echo -e "${GREEN}Combined Implementation Scaffolding Complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${BLUE}Files Created:${NC}"
 echo -e "  📄 $COMBINED_HTML"
 echo -e "  🎨 $COMBINED_CSS"
 echo -e "  ⚙️  $COMBINED_JS"
+echo -e "  🧪 $COMBINED_TEST"
+echo ""
+echo -e "${BLUE}Sections Included:${NC} $(($SECTION_NUM - 1))"
 echo ""
 echo -e "${YELLOW}Next Steps:${NC}"
-echo -e "  1. Implement each section placeholder with actual content"
-echo -e "  2. Add section-specific styles to CSS"
-echo -e "  3. Add section-specific JS if needed"
-echo -e "  4. Run tests: ${BLUE}npx playwright test tests/${PARENT_SLUG}.spec.js${NC}"
+echo -e "  1. Implement each section using Figma MCP:"
+echo -e "     ${BLUE}Use node IDs in HTML comments to get component details${NC}"
+echo -e ""
+echo -e "  2. Replace placeholders with actual component HTML/CSS"
+echo -e ""
+echo -e "  3. Test the combined page:"
+echo -e "     ${BLUE}npx playwright test tests/${PARENT_SLUG}.spec.js${NC}"
+echo -e ""
+echo -e "  4. Add visual regression tests"
+echo -e ""
+echo -e "  5. When complete, convert to Liquid:"
+echo -e "     ${BLUE}/to-liquid ${PARENT_SLUG}${NC}"
 echo ""
+echo -e "${GREEN}✨ Ready for implementation!${NC}"
+echo ""
+
+# Show which component is next if this was auto-detected
+if [ -z "$1" ]; then
+  echo -e "${BLUE}To continue with next component, run:${NC}"
+  echo -e "  ${BLUE}/implement-combined${NC}"
+  echo ""
+fi
