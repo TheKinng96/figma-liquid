@@ -4,6 +4,7 @@
     "task10.json",
     "task11.json",
     "task12.json",
+    "task13.json",
     "task2.json",
     "task3.json",
     "task4.json",
@@ -14,6 +15,6 @@
     "task9.json"
   ],
   "version": "2.0",
-  "lastUpdated": "2025-10-08T06:30:39Z",
+  "lastUpdated": "2025-10-08T06:30:41Z",
   "description": "Task files are now individual JSON files for better visibility"
 }
