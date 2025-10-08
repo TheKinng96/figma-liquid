@@ -18,6 +18,7 @@ SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/branch-detector.sh"
 source "$SCRIPT_DIR/task-helpers.sh"
 source "$SCRIPT_DIR/visual-validator.sh"
+source "$SCRIPT_DIR/figma-extractor.sh"
 
 BRANCH_ARG=$1
 
@@ -129,35 +130,10 @@ COMPLEXITY=$(get_task_complexity "$TARGET_BRANCH")
 FIGMA_LINK=$(get_figma_link "$TARGET_BRANCH")
 STATUS=$(get_task_status "$TARGET_BRANCH")
 
-# Extract node ID from individual task JSON files
-NODE_ID=""
-for task_json in .claude/tasks/task*.json; do
-  if [ -f "$task_json" ]; then
-    branch_match=$(jq -r "select(.branch == \"$TARGET_BRANCH\") | .nodeId // empty" "$task_json" 2>/dev/null || echo "")
-    if [ -n "$branch_match" ]; then
-      NODE_ID="$branch_match"
-      break
-    fi
-  fi
-done
-
-if [ -z "$NODE_ID" ]; then
-  echo -e "${YELLOW}⚠️  No node ID found in task JSON files${NC}"
-  echo -e "${YELLOW}Attempting to extract from task markdown file...${NC}"
-  NODE_ID=$(grep -A 1 "## Figma Node ID" "$TASK_FILE" | tail -1 | tr -d '`' || echo "")
-fi
-
-if [ -z "$NODE_ID" ]; then
-  echo -e "${RED}❌ Node ID not found. Cannot access Figma component via MCP.${NC}"
-  echo -e "${YELLOW}Please ensure the task was created with /breakdown${NC}"
-  exit 1
-fi
-
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}Task: $TASK_TITLE${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 echo -e "Branch: $TARGET_BRANCH"
-echo -e "Node ID: ${GREEN}$NODE_ID${NC}"
 echo -e "Complexity: $COMPLEXITY/10"
 echo -e "Status: $STATUS"
 echo -e "Figma: $FIGMA_LINK"
@@ -193,24 +169,40 @@ fi
 update_task_phase "$TARGET_BRANCH" "html"
 
 # Create output directories
-mkdir -p html html/css html/js tests
+mkdir -p html/html html/css html/js html/tests
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Phase 2: HTML Implementation${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-echo -e "${YELLOW}Claude will now:${NC}"
-echo -e "  1. Analyze Figma component using MCP"
-echo -e "  2. Generate semantic HTML structure"
-echo -e "  3. Create BEM CSS styles"
-echo -e "  4. Add JavaScript if needed"
-echo -e "  5. Create Playwright tests"
-echo -e "  6. Run visual validation"
-echo -e "  7. Update task file with results"
+# Extract Figma assets and measurements
+echo -e "${YELLOW}Step 1: Extract Figma Assets & Measurements${NC}\n"
+if [ -n "$FIGMA_LINK" ]; then
+  extract_all "$FIGMA_LINK" "$TASK_SLUG"
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ All assets and measurements extracted${NC}\n"
+  else
+    echo -e "${YELLOW}⚠️  Asset extraction had issues, proceeding anyway${NC}\n"
+  fi
+else
+  echo -e "${YELLOW}⚠️  No Figma link found, skipping asset extraction${NC}\n"
+fi
+
+echo -e "${YELLOW}Step 2: Claude Implementation${NC}\n"
+echo -e "Claude will now:"
+echo -e "  1. Use extracted assets from assets/ directory"
+echo -e "  2. Apply pixel-perfect measurements from FIGMA_MEASUREMENTS.md"
+echo -e "  3. Generate semantic HTML structure"
+echo -e "  4. Create BEM CSS with exact Figma values"
+echo -e "  5. Add JavaScript if needed"
+echo -e "  6. Create Playwright tests"
+echo -e "  7. Run visual validation"
+echo -e "  8. Update task file with results"
 echo ""
 
 # Log to task file
 log_to_task_file "$TASK_FILE" "Phase 2 started"
+log_to_task_file "$TASK_FILE" "Assets extracted from Figma"
 
 # Set up Playwright if not already configured
 if [ ! -f playwright.config.js ]; then
@@ -220,7 +212,7 @@ if [ ! -f playwright.config.js ]; then
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './html/tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -260,53 +252,25 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${YELLOW}Ready for Implementation${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-echo -e "${GREEN}Environment ready. Claude will now:${NC}"
-echo -e "  1. Use MCP to fetch Figma component data for node: ${GREEN}$NODE_ID${NC}"
-echo -e "  2. Generate HTML at: ${BLUE}html/$TASK_SLUG.html${NC}"
-echo -e "  3. Generate CSS at: ${BLUE}css/$TASK_SLUG.css${NC}"
-echo -e "  4. Generate tests at: ${BLUE}tests/$TASK_SLUG.spec.js${NC}"
-echo -e "  5. Run Playwright tests"
-echo -e "  6. Validate visual match ≥98%"
+echo -e "${GREEN}Environment ready. Claude should now:${NC}"
+echo -e "  1. Read ${BLUE}FIGMA_MEASUREMENTS.md${NC} for exact dimensions"
+echo -e "  2. Read ${BLUE}figma-data.json${NC} for detailed structure & colors"
+echo -e "  3. Use assets from ${BLUE}assets/${NC} directory (logo, icons)"
+echo -e "  4. Generate HTML at: ${BLUE}html/html/$TASK_SLUG.html${NC}"
+echo -e "  5. Generate CSS at: ${BLUE}html/css/$TASK_SLUG.css${NC} with pixel-perfect measurements"
+echo -e "  6. Generate JS at: ${BLUE}html/js/$TASK_SLUG.js${NC} (if needed)"
+echo -e "  7. Generate tests at: ${BLUE}html/tests/$TASK_SLUG.spec.js${NC}"
+echo -e "  8. Run Playwright tests"
+echo -e "  9. Validate visual match ≥98% against ${BLUE}figma-screenshots/$(basename $TASK_SLUG)-original.png${NC}"
 echo ""
-
-echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${PURPLE}MCP INSTRUCTIONS FOR CLAUDE${NC}"
-echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-
-echo -e "${BLUE}Use these MCP tools with node ID: ${GREEN}$NODE_ID${NC}\n"
-
-echo -e "${YELLOW}1. Get Component Metadata:${NC}"
-echo -e "   mcp__figma-dev-mode-mcp-server__get_metadata"
-echo -e "   - nodeId: $NODE_ID"
-echo -e "   - Returns: XML structure with layers, positions, sizes\n"
-
-echo -e "${YELLOW}2. Get Component Code/Styles:${NC}"
-echo -e "   mcp__figma-dev-mode-mcp-server__get_code"
-echo -e "   - nodeId: $NODE_ID"
-echo -e "   - Returns: Generated CSS and design specs\n"
-
-echo -e "${YELLOW}3. Get Component Screenshot:${NC}"
-echo -e "   mcp__figma-dev-mode-mcp-server__get_screenshot"
-echo -e "   - nodeId: $NODE_ID"
-echo -e "   - Returns: Visual reference for validation\n"
-
-echo -e "${YELLOW}4. Get Variables (if needed):${NC}"
-echo -e "   mcp__figma-dev-mode-mcp-server__get_variable_defs"
-echo -e "   - nodeId: $NODE_ID"
-echo -e "   - Returns: Design system variables\n"
-
-echo -e "${GREEN}After implementation:${NC}"
-echo -e "  - Run: ${BLUE}npm run test:validate${NC} (if configured)"
-echo -e "  - Mark HTML complete: ${BLUE}mark_html_complete \"$TARGET_BRANCH\"${NC}"
-echo -e "  - Update task file with progress\n"
-
-echo -e "${YELLOW}Tests will run automatically when implementation is done.${NC}"
+echo -e "${YELLOW}IMPORTANT:${NC}"
+echo -e "  - Use EXACT pixel values from FIGMA_MEASUREMENTS.md"
+echo -e "  - Use REAL assets from assets/ (not custom SVGs)"
+echo -e "  - Extract colors from figma-data.json fills"
+echo -e "  - Match layout positions exactly (gaps, spacing)"
+echo ""
+echo -e "${YELLOW}After implementation, tests will run automatically.${NC}"
 echo -e "${YELLOW}Task will be marked complete when all tests pass.${NC}\n"
 
-# Export node ID for Claude to access
-export FIGMA_NODE_ID="$NODE_ID"
-export TASK_SLUG="$TASK_SLUG"
-export TASK_BRANCH="$TARGET_BRANCH"
-
-# Note: Actual implementation happens through Claude's MCP and code generation
-# This script sets up the environment and provides structure
+# Note: Actual implementation happens through Claude's analysis and code generation
+# This script extracts all necessary data and sets up the environment

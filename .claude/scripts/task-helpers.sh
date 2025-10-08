@@ -18,14 +18,7 @@ init_tasks() {
   mkdir -p "$TASKS_DIR"
 
   if [ ! -f "$INDEX_FILE" ]; then
-    cat > "$INDEX_FILE" << 'EOF'
-{
-  "tasks": [],
-  "version": "2.0",
-  "lastUpdated": "",
-  "description": "Task files are now individual JSON files for better visibility. Each task is stored in task1.json, task2.json, etc. This index only lists the filenames."
-}
-EOF
+    echo '{"tasks":[]}' > "$INDEX_FILE"
     echo -e "${GREEN}✓ Task index created${NC}"
   fi
 }
@@ -234,16 +227,11 @@ list_tasks() {
   echo -e "${BLUE}Tasks${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-  # Read from individual task JSON files
-  for task_file in $TASKS_DIR/task*.json; do
-    if [ -f "$task_file" ]; then
-      if [ "$status_filter" = "all" ]; then
-        jq -r '"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))"' "$task_file"
-      else
-        jq -r "select(.status == \"$status_filter\") | \"\(.issueNumber). [\(.status)] \(.title) (branch: \(.branch))\"" "$task_file"
-      fi
-    fi
-  done
+  if [ "$status_filter" = "all" ]; then
+    jq -r '.tasks[] | "\(.id). [\(.status)] \(.title) (branch: \(.branch))"' "$INDEX_FILE"
+  else
+    jq -r ".tasks[] | select(.status == \"$status_filter\") | \"\(.id). [\(.status)] \(.title) (branch: \(.branch))\"" "$INDEX_FILE"
+  fi
 
   echo ""
 }
@@ -302,7 +290,10 @@ log_to_task_file() {
 
   # Find implementation log section and add entry
   local timestamp=$(date -u +%Y-%m-%dT%H:%M:%S)
-  echo "$timestamp - $message" >> "$task_file"
+  sed -i.bak "/^\`\`\`$/a\\
+$timestamp - $message" "$task_file"
+
+  rm "${task_file}.bak"
 }
 
 # Export functions

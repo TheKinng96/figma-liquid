@@ -35,7 +35,7 @@ get_layout_tolerance() {
 # Run Playwright visual regression tests
 run_visual_tests() {
   local component_name=$1
-  local test_file="tests/${component_name}.spec.js"
+  local test_file="html/tests/${component_name}.spec.js"
 
   if [ ! -f "$test_file" ]; then
     echo -e "${RED}❌ Test file not found: $test_file${NC}" >&2
@@ -74,7 +74,7 @@ compare_with_figma() {
   local viewport=$2  # desktop, tablet, mobile
 
   local figma_screenshot=".claude/data/figma-screenshots/${component_name}-${viewport}.png"
-  local playwright_screenshot="tests/screenshots/${component_name}-${viewport}.png"
+  local playwright_screenshot="html/tests/screenshots/${component_name}-${viewport}.png"
 
   if [ ! -f "$figma_screenshot" ]; then
     echo -e "${YELLOW}⚠️  Figma screenshot not found: $figma_screenshot${NC}"
@@ -153,7 +153,7 @@ update_baselines() {
 
   echo -e "${YELLOW}Updating visual baselines for $component_name...${NC}"
 
-  npx playwright test "tests/${component_name}.spec.js" --update-snapshots
+  npx playwright test "html/tests/${component_name}.spec.js" --update-snapshots
 
   echo -e "${GREEN}✓ Baselines updated${NC}"
 }
@@ -181,7 +181,7 @@ generate_validation_report() {
 ## Playwright Tests
 
 \`\`\`
-$(npx playwright test "tests/${component_name}.spec.js" --reporter=list 2>&1)
+$(npx playwright test "html/tests/${component_name}.spec.js" --reporter=list 2>&1)
 \`\`\`
 
 ## Next Steps

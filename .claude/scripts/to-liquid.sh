@@ -47,8 +47,8 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}Checking Phase 2 (HTML Implementation)...${NC}"
 
 # Check if HTML files exist
-HTML_FILE="html/$TASK_SLUG.html"
-CSS_FILE="css/$TASK_SLUG.css"
+HTML_FILE="html/html/$TASK_SLUG.html"
+CSS_FILE="html/css/$TASK_SLUG.css"
 
 if [ ! -f "$HTML_FILE" ]; then
   echo -e "${RED}❌ HTML file not found: $HTML_FILE${NC}"
