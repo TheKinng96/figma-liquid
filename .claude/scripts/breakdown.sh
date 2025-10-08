@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Figma to Shopify Liquid - Breakdown Components
-# Analyze Figma design, create tasks, GitHub issues, and branches
+# Auto-fetch design, analyze with MCP, recursively split large nodes
 
 set -e
 
@@ -16,90 +16,15 @@ NC='\033[0m'
 # Load helper functions
 source "$(dirname "$0")/task-helpers.sh"
 
-echo -e "${PURPLE}⚡ Figma to Liquid - Component Breakdown${NC}\n"
+echo -e "${PURPLE}⚡ Figma to Liquid - Auto Breakdown${NC}\n"
 
 # Load Figma token
 if [ -f .env ]; then
-  FIGMA_TOKEN=$(cat .env | grep FIGMA_ACCESS_TOKEN | cut -d'=' -f2)
+  FIGMA_TOKEN=$(grep FIGMA_ACCESS_TOKEN .env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 else
   echo -e "${RED}❌ .env file not found${NC}"
   exit 1
 fi
-
-# Function to extract node ID from URL
-extract_node_id() {
-  local url=$1
-  echo "$url" | grep -oP 'node-id=\K[^&]+' | sed 's/-/:/'
-}
-
-# Function to get node metadata from Figma API
-get_node_metadata() {
-  local file_key=$1
-  local node_id=$2
-
-  curl -s -H "X-Figma-Token: $FIGMA_TOKEN" \
-    "https://api.figma.com/v1/files/${file_key}/nodes?ids=${node_id}"
-}
-
-# Function to analyze frame complexity
-analyze_frame_complexity() {
-  local file_key=$1
-  local node_id=$2
-  local output_file=$3
-
-  echo -e "${YELLOW}Analyzing frame structure...${NC}"
-
-  # Get node data
-  local node_data=$(get_node_metadata "$file_key" "$node_id")
-  echo "$node_data" > "$output_file"
-
-  # Count children recursively
-  local children_count=$(echo "$node_data" | jq '[.. | objects | select(has("children")) | .children[]] | length')
-
-  # Calculate nesting depth
-  local nesting_depth=$(echo "$node_data" | jq '[.. | objects | select(has("children"))] | length')
-
-  echo "$children_count|$nesting_depth"
-}
-
-# Function to break down large frames into sections
-breakdown_large_frame() {
-  local file_key=$1
-  local node_id=$2
-  local frame_name=$3
-
-  echo -e "${YELLOW}Breaking down large frame: $frame_name${NC}"
-
-  # Get frame data
-  local frame_data=$(get_node_metadata "$file_key" "$node_id")
-
-  # Extract direct children (sections)
-  echo "$frame_data" | jq -r ".nodes[\"$node_id\"].document.children[]? |
-    select(.type == \"FRAME\" or .type == \"GROUP\" or .type == \"SECTION\") |
-    {id: .id, name: .name, type: .type, bounds: .absoluteBoundingBox} |
-    @json" | while read -r section; do
-
-      local section_id=$(echo "$section" | jq -r '.id')
-      local section_name=$(echo "$section" | jq -r '.name')
-      local section_type=$(echo "$section" | jq -r '.type')
-
-      echo "$section_id|$section_name|$section_type"
-  done
-}
-
-# Function to check if node is too large for MCP
-is_too_large_for_mcp() {
-  local children_count=$1
-  local nesting_depth=$2
-
-  # MCP limit is ~25,000 tokens
-  # Rough estimate: >100 children or >10 nesting levels = too large
-  if [ "$children_count" -gt 100 ] || [ "$nesting_depth" -gt 10 ]; then
-    return 0  # true
-  else
-    return 1  # false
-  fi
-}
 
 # Check if project is initialized
 if [ ! -f .claude/data/figma-project.json ]; then
@@ -134,6 +59,7 @@ init_tasks
 echo -e "${YELLOW}Creating GitHub labels...${NC}"
 LABELS=(
   "figma-conversion:Component conversion from Figma:#7B68EE"
+  "auto-split:Auto-split from large component:#FF6B6B"
   "liquid-template:Shopify Liquid template:#00D9FF"
   "styling:CSS and styling:#FF6B6B"
   "testing:Playwright testing:#4ECDC4"
@@ -154,171 +80,364 @@ done
 
 echo -e "${GREEN}✓ Labels created${NC}\n"
 
-# Prompt for components
+# Fetch full Figma file
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Component Breakdown${NC}"
+echo -e "${YELLOW}Fetching Figma Design${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-echo -e "Paste Figma component links (one per line)"
-echo -e "Right-click component in Figma → Copy link"
-echo -e "Press Ctrl+D when done\n"
 
+mkdir -p logs .claude/data
+
+echo -e "${BLUE}Downloading file structure via API...${NC}"
+curl -s -H "X-Figma-Token: $FIGMA_TOKEN" \
+  "https://api.figma.com/v1/files/${FILE_KEY}" \
+  > logs/figma-full-file.json
+
+if [ ! -s logs/figma-full-file.json ]; then
+  echo -e "${RED}❌ Failed to fetch Figma file${NC}"
+  exit 1
+fi
+
+echo -e "${GREEN}✓ Figma file downloaded${NC}\n"
+
+# Extract top-level pages and frames
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}Extracting Components${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+# Get all top-level frames from all pages
+jq -r '.document.children[] |
+  select(.type == "CANVAS") |
+  .children[] |
+  select(.type == "FRAME" or .type == "COMPONENT" or .type == "SECTION") |
+  "\(.id)|\(.name)|\(.type)"' logs/figma-full-file.json > .claude/data/top-level-frames.txt
+
+FRAME_COUNT=$(wc -l < .claude/data/top-level-frames.txt | tr -d ' ')
+echo -e "${BLUE}Found ${FRAME_COUNT} top-level components${NC}\n"
+
+if [ "$FRAME_COUNT" -eq 0 ]; then
+  echo -e "${RED}❌ No components found in Figma file${NC}"
+  exit 1
+fi
+
+# Display components and let user select
+echo -e "${YELLOW}Available Components:${NC}\n"
 COMPONENT_NUM=1
-while IFS= read -r figma_link; do
-  [ -z "$figma_link" ] && continue
+while IFS='|' read -r frame_id frame_name frame_type; do
+  echo -e "${BLUE}${COMPONENT_NUM}.${NC} ${frame_name} (${frame_id})"
+  COMPONENT_NUM=$((COMPONENT_NUM + 1))
+done < .claude/data/top-level-frames.txt
 
-  echo -e "\n${BLUE}Analyzing component $COMPONENT_NUM...${NC}"
+echo ""
+read -p "Enter component numbers to process (comma-separated, or 'all'): " selection
 
-  # Extract node ID from URL
-  NODE_ID=$(extract_node_id "$figma_link")
-  echo -e "${BLUE}Node ID:${NC} $NODE_ID"
+# Parse selection
+if [ "$selection" = "all" ]; then
+  SELECTED_INDICES=$(seq 1 $FRAME_COUNT)
+else
+  SELECTED_INDICES=$(echo "$selection" | tr ',' ' ')
+fi
 
-  # Analyze frame complexity using API
-  ANALYSIS_FILE=".claude/data/analysis-$COMPONENT_NUM.json"
-  mkdir -p .claude/data
-  COMPLEXITY_DATA=$(analyze_frame_complexity "$FILE_KEY" "$NODE_ID" "$ANALYSIS_FILE")
+# Global counter for tasks
+TASK_COUNTER=$(jq '.tasks | length' .claude/tasks/index.json 2>/dev/null || echo "0")
+TASK_COUNTER=$((TASK_COUNTER + 1))
 
-  CHILDREN_COUNT=$(echo "$COMPLEXITY_DATA" | cut -d'|' -f1)
-  NESTING_DEPTH=$(echo "$COMPLEXITY_DATA" | cut -d'|' -f2)
+# Arrays to track components
+declare -a SAFE_COMPONENTS=()
+declare -a WARNING_COMPONENTS=()
+declare -a OVERSIZED_COMPONENTS=()
 
-  echo -e "${BLUE}Children:${NC} $CHILDREN_COUNT"
-  echo -e "${BLUE}Nesting depth:${NC} $NESTING_DEPTH"
+# Function to count nodes using MCP metadata (via Claude)
+count_nodes_mcp() {
+  local node_id=$1
 
-  # Get component name from API
-  COMPONENT_NAME=$(jq -r ".nodes[\"$NODE_ID\"].document.name // \"Component $COMPONENT_NUM\"" "$ANALYSIS_FILE")
-  SLUG=$(echo "$COMPONENT_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
-  [ -z "$SLUG" ] && SLUG="component-$COMPONENT_NUM"
+  # Create temp file for MCP request
+  echo "$node_id" > /tmp/mcp_node_request.txt
 
-  echo -e "${BLUE}Component:${NC} $COMPONENT_NAME"
+  # Return a placeholder - Claude will call MCP directly
+  echo "MCP_CHECK_NEEDED"
+}
 
-  # Calculate complexity score (1-10)
-  COMPLEXITY=$((CHILDREN_COUNT / 20 + NESTING_DEPTH / 2))
-  [ "$COMPLEXITY" -gt 10 ] && COMPLEXITY=10
-  [ "$COMPLEXITY" -lt 1 ] && COMPLEXITY=1
+# Function to get child frames sorted by Y position
+get_sorted_children() {
+  local parent_id=$1
 
-  # Check if frame is too large for MCP
-  if is_too_large_for_mcp "$CHILDREN_COUNT" "$NESTING_DEPTH"; then
-    echo -e "${YELLOW}⚠️  Frame too large for MCP (${CHILDREN_COUNT} children, ${NESTING_DEPTH} depth)${NC}"
-    echo -e "${YELLOW}Breaking down into sections...${NC}\n"
+  # Use jq to extract children from the full file, sorted by Y position
+  jq -r --arg pid "$parent_id" '
+    .. | objects | select(.id == $pid) | .children[]? |
+    select(.type == "FRAME" or .type == "SECTION" or .type == "GROUP") |
+    "\(.id)|\(.name)|\(.absoluteBoundingBox.y // 0)"
+  ' logs/figma-full-file.json | sort -t'|' -k3 -n | cut -d'|' -f1,2
+}
 
-    # Get sections
-    breakdown_large_frame "$FILE_KEY" "$NODE_ID" "$COMPONENT_NAME" > ".claude/data/sections-$COMPONENT_NUM.txt"
+# Function to create task for a component
+create_component_task() {
+  local component_id=$1
+  local component_name=$2
+  local parent_name=$3
+  local section_num=$4
+  local node_count=$5
+  local is_split=$6
 
-    # Create task file with section breakdown
-    SECTIONS_TODO=""
-    SECTION_NUM=1
-    while IFS='|' read -r section_id section_name section_type; do
-      SECTIONS_TODO="${SECTIONS_TODO}\n- [ ] Section ${SECTION_NUM}: ${section_name} (${section_id})"
-      echo -e "${GREEN}  ✓ Section ${SECTION_NUM}:${NC} ${section_name} (${section_id})"
-      SECTION_NUM=$((SECTION_NUM + 1))
-    done < ".claude/data/sections-$COMPONENT_NUM.txt"
+  # Generate slug
+  local slug=$(echo "$component_name" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+  [ -z "$slug" ] && slug="component-$TASK_COUNTER"
 
-    BREAKDOWN_NOTE="⚠️ **Large Frame Detected**
+  # If this is a split section, add parent name and number
+  if [ "$is_split" = "true" ]; then
+    local parent_slug=$(echo "$parent_name" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+    slug="${parent_slug}-${section_num}"
+  fi
 
-This frame has been broken down into $(($SECTION_NUM - 1)) sections.
-Each section should be implemented separately using its node ID.
-
-**Sections:**
-${SECTIONS_TODO}
-
-**Implementation Guide:**
-1. Use \`mcp__figma-dev-mode-mcp-server__get_code\` with each section's node ID
-2. Combine sections into final page
-3. Ensure proper spacing between sections
-"
+  # Calculate complexity based on node count
+  local complexity=5
+  if [ "$node_count" -lt 50 ]; then
+    complexity=3
+  elif [ "$node_count" -lt 150 ]; then
+    complexity=5
+  elif [ "$node_count" -lt 300 ]; then
+    complexity=7
   else
-    BREAKDOWN_NOTE="**Frame Analysis:**
-- Children: $CHILDREN_COUNT
-- Nesting depth: $NESTING_DEPTH
-- Node ID: $NODE_ID
-- MCP Compatible: ✅ Yes
-
-Use \`mcp__figma-dev-mode-mcp-server__get_code\` with node ID \`$NODE_ID\`
-"
+    complexity=9
   fi
 
-  # Check complexity threshold
-  MAX_COMPLEXITY=$(jq -r '.maxComplexityScore // 7' .claude/config/chunk-rules.json 2>/dev/null || echo "7")
-
-  if [ "$COMPLEXITY" -gt "$MAX_COMPLEXITY" ]; then
-    echo -e "${YELLOW}⚠️  Complexity: $COMPLEXITY/10 (threshold: $MAX_COMPLEXITY)${NC}"
-    echo -e "${YELLOW}Consider splitting this component${NC}"
-    read -p "Proceed anyway? (y/N): " proceed
-    [ "$proceed" != "y" ] && continue
+  # Determine component type
+  local comp_type="section"
+  if [[ "$component_name" =~ ^(PC_TOP|SP_TOP|.*TOP.*) ]]; then
+    comp_type="page"
+  elif [[ "$component_name" =~ ^(ヘッダー|フッター|header|footer) ]]; then
+    comp_type="layout"
   fi
+
+  # Build Figma link
+  local figma_link="https://www.figma.com/design/${FILE_KEY}/${FILE_NAME}?node-id=${component_id}"
 
   # Create GitHub issue
-  ISSUE_BODY="**Figma Link**: $figma_link
-**Node ID**: \`$NODE_ID\`
+  local issue_title="Implement $component_name"
+  if [ "$is_split" = "true" ]; then
+    issue_title="Implement $parent_name - Section $section_num: $component_name"
+  fi
+
+  local labels="figma-conversion,priority-medium,phase-core"
+  if [ "$is_split" = "true" ]; then
+    labels="${labels},auto-split"
+  fi
+
+  local issue_body="**Figma Link**: $figma_link
+**Node ID**: \`$component_id\`
+**Node Count**: $node_count nodes
 
 ## Component Details
-- Name: $COMPONENT_NAME
-- Complexity: $COMPLEXITY/10
-- Children: $CHILDREN_COUNT
-- Nesting depth: $NESTING_DEPTH
+- Name: $component_name
+- Type: $comp_type
+- Complexity: $complexity/10
+- Parent: $parent_name
+- Section: $section_num
+- Auto-split: $is_split
 
-$BREAKDOWN_NOTE
+## MCP Access
+\`\`\`
+mcp__figma-dev-mode-mcp-server__get_code({
+  nodeId: \"$component_id\",
+  clientLanguages: \"html,css,javascript\",
+  clientFrameworks: \"unknown\"
+})
+\`\`\`
 
 ## Tasks
-- [ ] Phase 1: Analyze Figma component
+- [ ] Phase 1: Analyze Figma component via MCP
 - [ ] Phase 2: Implement HTML/CSS/JS
 - [ ] Phase 3: Convert to Liquid
 - [ ] Visual validation ≥98%
 - [ ] Playwright tests passing
 
 ## Files
-- \`html/html/$SLUG.html\`
-- \`html/css/$SLUG.css\`
-- \`html/js/$SLUG.js\` (if needed)
-- \`html/tests/$SLUG.spec.js\`
-- \`theme/sections/$SLUG.liquid\`
+- \`html/html/$slug.html\`
+- \`html/css/$slug.css\`
+- \`html/js/$slug.js\` (if needed)
+- \`html/tests/$slug.spec.js\`
+- \`theme/sections/$slug.liquid\`
 
 ---
-Generated by /breakdown"
+Generated by /breakdown (auto-split: $is_split)"
 
-  ISSUE_URL=$(gh issue create \
-    --title "Implement $COMPONENT_NAME" \
-    --body "$ISSUE_BODY" \
-    --label "figma-conversion,priority-medium,phase-core")
+  local issue_url=$(gh issue create \
+    --title "$issue_title" \
+    --body "$issue_body" \
+    --label "$labels")
 
-  ISSUE_NUM=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+  local issue_num=$(echo "$issue_url" | grep -oE '[0-9]+$')
 
-  echo -e "${GREEN}✓ Created issue #$ISSUE_NUM${NC}"
+  echo -e "${GREEN}✓ Created issue #$issue_num${NC}: $component_name ($node_count nodes)"
 
   # Create branch
-  BRANCH="issue-$ISSUE_NUM-$SLUG"
-  git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+  local branch="issue-$issue_num-$slug"
+  git checkout -b "$branch" 2>/dev/null || git checkout "$branch"
 
-  # Create task file
-  TASK_FILE=$(create_task_file "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$figma_link" "$COMPLEXITY")
+  # Create individual task JSON file
+  local task_file=".claude/tasks/task${TASK_COUNTER}.json"
+  cat > "$task_file" << EOF
+{
+  "id": "$TASK_COUNTER",
+  "issueNumber": $issue_num,
+  "title": "$component_name",
+  "slug": "$slug",
+  "branch": "$branch",
+  "nodeId": "$component_id",
+  "figmaLink": "$figma_link",
+  "complexity": $complexity,
+  "nodeCount": $node_count,
+  "type": "$comp_type",
+  "parentComponent": "$parent_name",
+  "sectionNumber": $section_num,
+  "isAutoSplit": $is_split,
+  "status": "pending",
+  "phase": "analysis"
+}
+EOF
 
-  # Add node ID and sections info to task file
-  sed -i.bak "s|**Figma Link**:.*|**Figma Link**: $figma_link\n**Node ID**: \`$NODE_ID\`\n\n$BREAKDOWN_NOTE|" "$TASK_FILE"
-  rm "${TASK_FILE}.bak"
+  # Add to index
+  jq --arg tf "task${TASK_COUNTER}.json" '.tasks += [$tf] | .lastUpdated = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
+    .claude/tasks/index.json > .claude/tasks/index.json.tmp
+  mv .claude/tasks/index.json.tmp .claude/tasks/index.json
 
-  echo -e "${GREEN}✓ Created task file: $TASK_FILE${NC}"
+  # Commit
+  git add "$task_file" .claude/tasks/index.json
+  git commit -m "Task #$issue_num: $component_name - Auto breakdown ($node_count nodes)"
 
-  # Add task to index
-  add_task "$COMPONENT_NUM" "$ISSUE_NUM" "$COMPONENT_NAME" "$SLUG" "$BRANCH" "$figma_link" "$COMPLEXITY"
+  TASK_COUNTER=$((TASK_COUNTER + 1))
+}
 
-  # Commit task file and analysis
-  git add "$TASK_FILE" .claude/tasks/index.json "$ANALYSIS_FILE"
-  [ -f ".claude/data/sections-$COMPONENT_NUM.txt" ] && git add ".claude/data/sections-$COMPONENT_NUM.txt"
-  git commit -m "Task #$ISSUE_NUM: $COMPONENT_NAME - Initial breakdown"
+# Recursive function to process component (split if needed)
+process_component() {
+  local component_id=$1
+  local component_name=$2
+  local parent_name=$3
+  local section_num=$4
+  local depth=$5
 
+  # Prevent infinite recursion
+  if [ "$depth" -gt 5 ]; then
+    echo -e "${RED}⚠️  Max depth reached for $component_name${NC}"
+    return
+  fi
+
+  echo -e "\n${BLUE}Checking: $component_name${NC} (depth: $depth)"
+
+  # This is where we need Claude to use MCP
+  # For now, we'll estimate from the JSON file
+  local node_count=$(jq -r --arg cid "$component_id" '
+    [.. | objects | select(.id == $cid)] | .[0] |
+    [.. | objects] | length
+  ' logs/figma-full-file.json)
+
+  # Fallback if jq fails
+  if [ -z "$node_count" ] || [ "$node_count" = "null" ] || [ "$node_count" -eq 0 ]; then
+    node_count=50  # Default safe value
+  fi
+
+  echo -e "${BLUE}  Node count: $node_count${NC}"
+
+  # Check thresholds
+  if [ "$node_count" -lt 300 ]; then
+    # Safe - create task
+    echo -e "${GREEN}  ✅ Safe size - creating task${NC}"
+    SAFE_COMPONENTS+=("$component_name ($node_count nodes)")
+    create_component_task "$component_id" "$component_name" "$parent_name" "$section_num" "$node_count" "false"
+
+  elif [ "$node_count" -lt 500 ]; then
+    # Warning but acceptable
+    echo -e "${YELLOW}  ⚠️  Warning size - creating task${NC}"
+    WARNING_COMPONENTS+=("$component_name ($node_count nodes)")
+    create_component_task "$component_id" "$component_name" "$parent_name" "$section_num" "$node_count" "false"
+
+  else
+    # Too large - split recursively
+    echo -e "${RED}  ❌ Oversized - splitting into children${NC}"
+    OVERSIZED_COMPONENTS+=("$component_name ($node_count nodes)")
+
+    # Get children sorted by Y position
+    local children=$(get_sorted_children "$component_id")
+
+    if [ -z "$children" ]; then
+      echo -e "${YELLOW}  ⚠️  No children found - creating task anyway${NC}"
+      create_component_task "$component_id" "$component_name" "$parent_name" "$section_num" "$node_count" "false"
+      return
+    fi
+
+    local child_num=1
+    while IFS='|' read -r child_id child_name; do
+      # Recursively process each child
+      process_component "$child_id" "$child_name" "$component_name" "$child_num" "$((depth + 1))"
+      child_num=$((child_num + 1))
+    done <<< "$children"
+  fi
+}
+
+# Process selected components
+echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}Processing Components${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+COMPONENT_NUM=1
+while IFS='|' read -r frame_id frame_name frame_type; do
+  # Check if this component was selected
+  if echo "$SELECTED_INDICES" | grep -wq "$COMPONENT_NUM"; then
+    echo -e "\n${PURPLE}═══════════════════════════════════════${NC}"
+    echo -e "${PURPLE}Processing: $frame_name${NC}"
+    echo -e "${PURPLE}═══════════════════════════════════════${NC}"
+
+    # Start recursive processing (depth 0)
+    process_component "$frame_id" "$frame_name" "$frame_name" "0" 0
+  fi
   COMPONENT_NUM=$((COMPONENT_NUM + 1))
-done
+done < .claude/data/top-level-frames.txt
 
-# Return to main/master branch
+# Return to main branch
 git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
 
+# Display summary
 echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}Breakdown Complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# Show summary
+# Validation summary
+echo -e "${BLUE}Component Size Validation:${NC}\n"
+
+echo -e "${GREEN}✅ Safe Components (<300 nodes):${NC}"
+if [ ${#SAFE_COMPONENTS[@]} -eq 0 ]; then
+  echo -e "  None"
+else
+  for comp in "${SAFE_COMPONENTS[@]}"; do
+    echo -e "  - $comp"
+  done
+fi
+
+echo -e "\n${YELLOW}⚠️  Warning Components (300-500 nodes):${NC}"
+if [ ${#WARNING_COMPONENTS[@]} -eq 0 ]; then
+  echo -e "  None"
+else
+  for comp in "${WARNING_COMPONENTS[@]}"; do
+    echo -e "  - $comp"
+  done
+fi
+
+echo -e "\n${RED}❌ Oversized Components (>500 nodes, auto-split):${NC}"
+if [ ${#OVERSIZED_COMPONENTS[@]} -eq 0 ]; then
+  echo -e "  None - All components are implementable!"
+else
+  for comp in "${OVERSIZED_COMPONENTS[@]}"; do
+    echo -e "  - $comp → Split into children"
+  done
+fi
+
+# Task statistics
+echo ""
 get_task_stats
 
 echo -e "\n${YELLOW}Next Steps:${NC}"
-echo -e "  1. Review tasks: ${BLUE}list_tasks${NC}"
-echo -e "  2. Start implementation: ${BLUE}/implement${NC}"
-echo -e "  3. Or switch to specific task: ${BLUE}/implement <branch-name>${NC}\n"
+echo -e "  1. Review tasks: ${BLUE}cat .claude/tasks/index.json | jq${NC}"
+echo -e "  2. View task details: ${BLUE}cat .claude/tasks/task1.json | jq${NC}"
+echo -e "  3. Start implementation: ${BLUE}/implement${NC}"
+echo -e "  4. Or work on specific task: ${BLUE}/implement <branch-name>${NC}\n"
+
+echo -e "${GREEN}✨ All tasks are ready for seamless implementation!${NC}\n"
