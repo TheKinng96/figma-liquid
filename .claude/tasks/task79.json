@@ -1,0 +1,17 @@
+{
+  "id": "79",
+  "issueNumber": 315,
+  "title": "Frame 1653",
+  "slug": "frame-1653",
+  "branch": "issue-315-frame-1653",
+  "nodeId": "111:2245",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2245",
+  "complexity": 5,
+  "nodeCount": 51,
+  "type": "section",
+  "parentComponent": "PC_商品詳細",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
