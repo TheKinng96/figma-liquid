@@ -1,0 +1,17 @@
+{
+  "id": "85",
+  "issueNumber": 321,
+  "title": "ヘッダーE",
+  "slug": "e",
+  "branch": "issue-321-e",
+  "nodeId": "111:2527",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2527",
+  "complexity": 9,
+  "nodeCount": 399,
+  "type": "layout",
+  "parentComponent": "PC_コレクションテンプレート（ブランド）",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
