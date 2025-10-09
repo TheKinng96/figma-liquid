@@ -1,0 +1,17 @@
+{
+  "id": "28",
+  "issueNumber": 264,
+  "title": "Frame 1523",
+  "slug": "frame-1523",
+  "branch": "issue-264-frame-1523",
+  "nodeId": "111:113",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:113",
+  "complexity": 3,
+  "nodeCount": 18,
+  "type": "section",
+  "parentComponent": "PC_TOP",
+  "sectionNumber": 6,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
