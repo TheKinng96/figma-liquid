@@ -1,0 +1,17 @@
+{
+  "id": "81",
+  "issueNumber": 317,
+  "title": "Frame 1512",
+  "slug": "frame-1512",
+  "branch": "issue-317-frame-1512",
+  "nodeId": "111:2330",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2330",
+  "complexity": 7,
+  "nodeCount": 214,
+  "type": "section",
+  "parentComponent": "Frame 1651",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
