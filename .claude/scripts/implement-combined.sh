@@ -26,36 +26,33 @@ find_next_parent() {
     exit 1
   fi
 
-  # Get all task files
-  local task_files=$(jq -r '.tasks[]' .claude/tasks/index.json)
+  # Get all task JSON files directly
+  local task_files=$(ls .claude/tasks/task*.json 2>/dev/null || echo "")
 
   if [ -z "$task_files" ]; then
-    echo -e "${RED}❌ No tasks found in index.${NC}" >&2
+    echo -e "${RED}❌ No task files found.${NC}" >&2
     exit 1
   fi
 
   # Group tasks by parent component and find first pending/in-progress
   local parent=""
   for task_file in $task_files; do
-    local task_data=$(cat ".claude/tasks/$task_file")
-    local status=$(echo "$task_data" | jq -r '.status')
-    local parent_component=$(echo "$task_data" | jq -r '.parentComponent')
-    local is_auto_split=$(echo "$task_data" | jq -r '.isAutoSplit')
+    if [ ! -f "$task_file" ]; then
+      continue
+    fi
+
+    local task_data=$(cat "$task_file")
+    local status=$(echo "$task_data" | jq -r '.status // "pending"')
+    local parent_component=$(echo "$task_data" | jq -r '.parentComponent // empty')
 
     # Skip completed tasks
     if [ "$status" = "completed" ]; then
       continue
     fi
 
-    # If this is an auto-split task, use parent component
-    if [ "$is_auto_split" = "true" ] && [ -n "$parent_component" ]; then
+    # Use parent component if available
+    if [ -n "$parent_component" ] && [ "$parent_component" != "null" ]; then
       parent=$parent_component
-      break
-    fi
-
-    # Otherwise use the task title as parent
-    if [ -z "$parent" ]; then
-      parent=$(echo "$task_data" | jq -r '.title')
       break
     fi
   done
@@ -81,20 +78,24 @@ fi
 echo -e "${BLUE}Parent Component:${NC} $PARENT_SLUG\n"
 
 # Find all related task files
-if [ ! -f .claude/tasks/index.json ]; then
-  echo -e "${RED}❌ No tasks found. Run /breakdown first.${NC}"
+TASK_FILES=$(ls .claude/tasks/task*.json 2>/dev/null || echo "")
+
+if [ -z "$TASK_FILES" ]; then
+  echo -e "${RED}❌ No task files found.${NC}"
   exit 1
 fi
 
 # Get all task files and filter by parent
-TASK_FILES=$(jq -r '.tasks[]' .claude/tasks/index.json)
 MATCHING_TASKS=""
 
 for task_file in $TASK_FILES; do
-  task_data=$(cat ".claude/tasks/$task_file")
-  slug=$(echo "$task_data" | jq -r '.slug')
-  parent=$(echo "$task_data" | jq -r '.parentComponent')
-  is_auto_split=$(echo "$task_data" | jq -r '.isAutoSplit')
+  if [ ! -f "$task_file" ]; then
+    continue
+  fi
+
+  task_data=$(cat "$task_file")
+  slug=$(echo "$task_data" | jq -r '.slug // empty')
+  parent=$(echo "$task_data" | jq -r '.parentComponent // empty')
 
   # Match by slug pattern or parent component
   if [[ "$slug" == "$PARENT_SLUG"* ]] || [ "$parent" = "$PARENT_SLUG" ]; then
@@ -106,9 +107,14 @@ if [ -z "$MATCHING_TASKS" ]; then
   echo -e "${RED}❌ No tasks found for parent: $PARENT_SLUG${NC}"
   echo -e "${YELLOW}Available parents:${NC}"
   for task_file in $TASK_FILES; do
-    task_data=$(cat ".claude/tasks/$task_file")
-    parent=$(echo "$task_data" | jq -r '.parentComponent // .title')
-    echo "  - $parent"
+    if [ ! -f "$task_file" ]; then
+      continue
+    fi
+    task_data=$(cat "$task_file")
+    parent=$(echo "$task_data" | jq -r '.parentComponent // .title // empty')
+    if [ -n "$parent" ]; then
+      echo "  - $parent"
+    fi
   done | sort -u
   exit 1
 fi
@@ -118,17 +124,27 @@ echo -e "${GREEN}Found $TASK_COUNT sections to combine${NC}\n"
 
 # Sort tasks by section number
 SORTED_TASKS=$(for task_file in $MATCHING_TASKS; do
-  task_data=$(cat ".claude/tasks/$task_file")
+  task_data=$(cat "$task_file")
   section_num=$(echo "$task_data" | jq -r '.sectionNumber // 0')
   echo "$section_num:$task_file"
 done | sort -n | cut -d':' -f2)
 
 # Output files
-mkdir -p html html/css html/js tests
+mkdir -p html html/css html/js html/assets tests
 COMBINED_HTML="html/${PARENT_SLUG}.html"
 COMBINED_CSS="html/css/${PARENT_SLUG}.css"
 COMBINED_JS="html/js/${PARENT_SLUG}.js"
 COMBINED_TEST="tests/${PARENT_SLUG}.spec.js"
+
+# Create assets directories for each task
+echo -e "${BLUE}Creating assets directories...${NC}"
+for task_file in $SORTED_TASKS; do
+  task_data=$(cat "$task_file")
+  SECTION_SLUG=$(echo "$task_data" | jq -r '.slug')
+  mkdir -p "html/assets/${SECTION_SLUG}"
+  echo -e "  ${GREEN}✓ html/assets/${SECTION_SLUG}/${NC}"
+done
+echo ""
 
 echo -e "${BLUE}Creating combined files...${NC}"
 
@@ -169,11 +185,14 @@ cat > "$COMBINED_JS" << EOF
 EOF
 
 # Process each section in order
+# NOTE: Claude should download assets and fetch code via Figma MCP for each section
+# - Use mcp__figma-dev-mode-mcp-server__get_screenshot to download screenshot
+# - Use mcp__figma-dev-mode-mcp-server__get_code to fetch actual HTML/CSS/JS
 SECTION_NUM=1
 for task_file in $SORTED_TASKS; do
   echo -e "${BLUE}  Processing section $SECTION_NUM...${NC}"
 
-  task_data=$(cat ".claude/tasks/$task_file")
+  task_data=$(cat "$task_file")
 
   NODE_ID=$(echo "$task_data" | jq -r '.nodeId')
   SECTION_SLUG=$(echo "$task_data" | jq -r '.slug')
@@ -186,6 +205,8 @@ for task_file in $SORTED_TASKS; do
   fi
 
   echo -e "    ${GREEN}Node: $NODE_ID - $SECTION_TITLE${NC}"
+  echo -e "    ${YELLOW}📸 Assets folder: html/assets/${SECTION_SLUG}/${NC}"
+  echo -e "    ${YELLOW}TODO: Download screenshot and code via Figma MCP${NC}"
 
   # Get frame width from Figma file (if available)
   FRAME_WIDTH=1440
@@ -293,9 +314,9 @@ EOF
 EOF
 
   # Update task status to in_progress
-  jq '.status = "in_progress" | .phase = "implementation" | .updated = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
-    ".claude/tasks/$task_file" > ".claude/tasks/$task_file.tmp"
-  mv ".claude/tasks/$task_file.tmp" ".claude/tasks/$task_file"
+  jq '.status = "in_progress" | .phase = "implementation" | .updated = (now | todate)' \
+    "$task_file" > "${task_file}.tmp"
+  mv "${task_file}.tmp" "$task_file"
 
   SECTION_NUM=$((SECTION_NUM + 1))
 done
@@ -381,11 +402,14 @@ echo -e "  🧪 $COMBINED_TEST"
 echo ""
 echo -e "${BLUE}Sections Included:${NC} $(($SECTION_NUM - 1))"
 echo ""
-echo -e "${YELLOW}Next Steps:${NC}"
-echo -e "  1. Implement each section using Figma MCP:"
-echo -e "     ${BLUE}Use node IDs in HTML comments to get component details${NC}"
+echo -e "${YELLOW}Next Steps (Claude should do this automatically):${NC}"
+echo -e "  1. Download assets for each section:"
+echo -e "     ${BLUE}Use mcp__figma-dev-mode-mcp-server__get_screenshot${NC}"
+echo -e "     ${BLUE}Save to: html/assets/{section-slug}/screenshot.png${NC}"
 echo -e ""
-echo -e "  2. Replace placeholders with actual component HTML/CSS"
+echo -e "  2. Fetch actual code for each section:"
+echo -e "     ${BLUE}Use mcp__figma-dev-mode-mcp-server__get_code${NC}"
+echo -e "     ${BLUE}Replace placeholders with actual HTML/CSS/JS${NC}"
 echo -e ""
 echo -e "  3. Test the combined page:"
 echo -e "     ${BLUE}npx playwright test tests/${PARENT_SLUG}.spec.js${NC}"
@@ -395,7 +419,7 @@ echo -e ""
 echo -e "  5. When complete, convert to Liquid:"
 echo -e "     ${BLUE}/to-liquid ${PARENT_SLUG}${NC}"
 echo ""
-echo -e "${GREEN}✨ Ready for implementation!${NC}"
+echo -e "${GREEN}✨ Scaffolding ready - Claude should now fetch assets and code from Figma!${NC}"
 echo ""
 
 # Show which component is next if this was auto-detected

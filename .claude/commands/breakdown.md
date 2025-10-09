@@ -1,184 +1,234 @@
 ---
-description: Auto-analyze Figma design and create implementation tasks with smart splitting
+command: breakdown
+description: Intelligently break down Figma designs into manageable implementation tasks
 ---
 
-Execute the breakdown.sh script to automatically extract, analyze, and break down Figma components into implementable tasks.
+# Breakdown Figma Design
 
-**What this does:**
+## Overview
+This command analyzes your Figma file and intelligently splits it into implementable sections, creating a task markdown file for each section.
 
-1. **Check Prerequisites**
-   - Verify project initialized with /init-figma
-   - Check GitHub CLI authentication
-   - Verify Figma API access token
+## Prerequisites
+- Figma API token configured
+- Figma file ID in `.claude/config.json`
+- Project initialized with `/init-figma`
 
-2. **Auto-Fetch Figma Design**
-   - Download full Figma file structure via API to `logs/figma-full-file.json`
-   - Extract all top-level frames/components from all pages
-   - Display list of available components with IDs
-   - Allow selection of specific components or all
+## Execution Steps
 
-3. **Smart Component Analysis & Recursive Splitting**
-
-   **For each selected component:**
-
-   a. **Count nodes** from Figma API data structure
-
-   b. **Check size thresholds:**
-      - ✅ **< 300 nodes**: Safe for MCP - create task
-      - ⚠️ **300-500 nodes**: Warning but workable - create task
-      - ❌ **> 500 nodes**: Too large for MCP - auto-split
-
-   c. **Recursive Auto-Splitting (>500 nodes):**
-      - Extract direct child frames sorted by Y position (top to bottom)
-      - **Recursively** check each child's size
-      - If child also >500 nodes, **split that child too**
-      - Continues until all leaf components are <500 nodes
-      - Max depth: 5 levels to prevent infinite recursion
-      - **Only creates tasks for safe-sized components**
-      - Parent containers are skipped (no task created)
-
-   **Why This Matters:**
-   - MCP tools have ~25,000 token output limit
-   - Components >500 nodes typically exceed this limit
-   - Recursive splitting ensures **all** tasks are implementable
-   - No manual re-breakdown needed during implementation!
-
-4. **For Each Safe Component (Task Creation):**
-   - **Generate slug** from component name
-   - **Calculate complexity** (1-10) based on node count:
-     - <50 nodes: 3/10
-     - <150 nodes: 5/10
-     - <300 nodes: 7/10
-     - ≥300 nodes: 9/10
-   - **Determine type**: page, layout, or section
-   - **Build Figma link** with node ID
-   - **Create GitHub issue** with:
-     - Title: "Implement {Component}" or "Implement {Parent} - Section N: {Component}"
-     - Node ID and node count in body
-     - MCP access code snippet
-     - Task checklist (Phase 1/2/3)
-     - Labels: figma-conversion, auto-split (if applicable), priority, phase
-   - **Create git branch**: `issue-{N}-{slug}`
-   - **Create task JSON file**: `.claude/tasks/task{N}.json`
-     - Includes: nodeId, nodeCount, parentComponent, sectionNumber, isAutoSplit
-     - Status: pending, Phase: analysis
-   - **Update index**: `.claude/tasks/index.json`
-   - **Commit** to branch
-
-5. **Validation Summary**
-   - Display breakdown by size category:
-     - ✅ Safe components (<300 nodes)
-     - ⚠️ Warning components (300-500 nodes)
-     - ❌ Oversized components (>500 nodes, auto-split)
-   - Show task statistics
-   - List next steps
-
-**Example Auto-Split Flow:**
-
-```
-PC_TOP (786 nodes) ❌ Too large
-├── Auto-split into 7 children:
-│   ├── ヘッダーE (56 nodes) ✅ Safe → Task #1
-│   ├── Frame 1689 (16 nodes) ✅ Safe → Task #2
-│   ├── sec02_bnr_pc (6 nodes) ✅ Safe → Task #3
-│   ├── Frame 1567 (615 nodes) ❌ Still too large!
-│   │   ├── Auto-split Frame 1567 into 8 children:
-│   │   │   ├── Frame 1497 (107 nodes) ✅ Safe → Task #4
-│   │   │   ├── Frame 1566 (58 nodes) ✅ Safe → Task #5
-│   │   │   └── ... (Tasks #6-#11)
-│   ├── Frame 1569 (33 nodes) ✅ Safe → Task #12
-│   ├── Frame 1523 (2 nodes) ✅ Safe → Task #13
-│   └── Frame 1493 (57 nodes) ✅ Safe → Task #14
-
-Result: PC_TOP split into 14 implementable tasks
+### Step 1: Fetch Figma File Structure
+```bash
+# Get Figma file data
+curl -s -H "X-Figma-Token: $FIGMA_TOKEN" \
+    "https://api.figma.com/v1/files/$FIGMA_FILE_ID" \
+    > .claude/data/figma-file.json
 ```
 
-**Task Structure:**
+### Step 2: Analyze Frame Structure
+Read `.claude/data/figma-file.json` and identify:
+- Main design frames (width: 375/768/1440/1920px)
+- Exclude component libraries and random frames
+- Separate mobile/tablet/desktop designs
 
-Individual JSON files for better visibility:
+### Step 3: Intelligent Section Splitting
 
-`.claude/tasks/task1.json`:
+For each identified design frame:
+
+1. **Analyze the frame hierarchy**
+   - Count nodes in each child element
+   - Identify logical groupings (header, hero, sections, footer)
+   - Consider Y-position for top-to-bottom ordering
+
+2. **Apply splitting rules:**
+   ```
+   IF section has 100-400 nodes → Create as single task
+   IF section has < 50 nodes → Merge with adjacent section
+   IF section has > 400 nodes → Split into sub-sections
+   ```
+
+3. **Smart naming based on:**
+   - Position (first = header, last = footer)
+   - Content analysis (hero, gallery, testimonials, etc.)
+   - Figma layer names (cleaned up)
+   - Default to "Section N" if unclear
+
+### Step 4: Generate Task Files
+
+For each section, create a markdown file using this structure:
+
+#### File naming: `.claude/tasks/{device}/task-{number}-{section-name}.md`
+
+Example structure:
+```
+.claude/tasks/
+├── desktop/
+│   ├── task-001-header.md
+│   ├── task-002-hero.md
+│   ├── task-003-features.md
+│   └── task-004-footer.md
+├── mobile/
+│   ├── task-001-header.md
+│   └── task-002-hero.md
+└── index.json
+```
+
+### Step 5: Task Template
+
+Each task file should follow this template:
+
+```markdown
+---
+task_id: task-001
+section_name: Header
+frame_name: Desktop_Home
+frame_width: 1440
+node_id: "12:34"
+node_count: 156
+figma_link: https://www.figma.com/file/{file_id}?node-id=12:34
+status: pending
+created_at: 2025-01-09T10:00:00Z
+---
+
+# Task: Implement Header
+
+## CRITICAL INSTRUCTIONS
+⚠️ **DO NOT GUESS OR USE PLACEHOLDERS** - Every measurement, color, and asset is available in Figma
+⚠️ **ALWAYS USE FIGMA MCP** to get exact values before implementing
+⚠️ **FRAME WIDTH IS ABSOLUTE** - This design is 1440px wide
+
+## 1. Figma MCP Access
+Copy this exact link to access the component:
+\```
+https://www.figma.com/file/{file_id}?node-id=12:34
+\```
+
+## 2. Required Assets to Download
+Before starting implementation, download these assets from Figma:
+
+### Images
+- [ ] `logo.svg` - Company logo
+- [ ] `hero-bg.jpg` - Background image
+
+### Fonts
+- [ ] Inter - Regular, Medium, Bold
+
+## 3. Container Requirements
+\```
+Frame Width: 1440px (absolute)
+Section Width: [CHECK WITH FIGMA MCP]
+If section width < frame width:
+  - Add container with transparent background
+  - Center the section within frame
+\```
+
+## 4. Implementation Checklist
+
+### Step 1: Verify Measurements with Figma MCP
+\```bash
+# Get exact measurements - DO NOT SKIP THIS
+figma get-node --id "12:34"
+\```
+
+Record these values:
+- [ ] Section width: ___px
+- [ ] Section height: ___px
+- [ ] Padding: ___px
+- [ ] Gap between elements: ___px
+
+### Step 2: Get Exact Colors
+- [ ] Background: #______
+- [ ] Text primary: #______
+- [ ] Borders: #______
+
+## 5. Validation Rules
+- [ ] All measurements match Figma exactly
+- [ ] All assets downloaded (no placeholders)
+- [ ] Frame width is exactly 1440px
+- [ ] Colors are exact hex values from Figma
+```
+
+### Step 6: Create Index File
+
+Generate `.claude/tasks/index.json`:
 ```json
 {
-  "id": "1",
-  "issueNumber": 29,
-  "title": "ヘッダーE",
-  "slug": "pc-top-1",
-  "branch": "issue-29-pc-top-1",
-  "nodeId": "111:785",
-  "figmaLink": "https://figma.com/...",
-  "complexity": 5,
-  "nodeCount": 56,
-  "type": "layout",
-  "parentComponent": "PC_TOP",
-  "sectionNumber": 1,
-  "isAutoSplit": "true",
-  "status": "pending",
-  "phase": "analysis"
+  "version": "1.0",
+  "created_at": "2025-01-09T10:00:00Z",
+  "figma_file": "{file_id}",
+  "devices": {
+    "desktop": {
+      "frame_width": 1440,
+      "tasks": [
+        {
+          "id": "task-001",
+          "file": "desktop/task-001-header.md",
+          "section": "Header",
+          "node_count": 156,
+          "status": "pending"
+        }
+      ]
+    },
+    "mobile": {
+      "frame_width": 375,
+      "tasks": []
+    }
+  },
+  "statistics": {
+    "total_tasks": 8,
+    "by_device": {
+      "desktop": 4,
+      "mobile": 4
+    }
+  }
 }
 ```
 
-`.claude/tasks/index.json`:
-```json
-{
-  "tasks": ["task1.json", "task2.json", ...],
-  "version": "2.0",
-  "lastUpdated": "2025-10-08T12:00:00Z"
-}
+## Smart Splitting Logic
+
+### Identifying Main Frames
+```javascript
+// Pseudo-code for frame identification
+frames.filter(frame => {
+  const isStandardWidth = [375, 768, 1440, 1920].includes(frame.width);
+  const isTallEnough = frame.height > 500;
+  const notComponent = !frame.name.includes('component');
+  return isStandardWidth && isTallEnough && notComponent;
+});
 ```
 
-**After running:**
-
-1. Review all tasks:
-   ```bash
-   cat .claude/tasks/index.json | jq
-   ```
-
-2. View specific task:
-   ```bash
-   cat .claude/tasks/task1.json | jq
-   ```
-
-3. View all tasks at once:
-   ```bash
-   cat .claude/tasks/task*.json | jq -s
-   ```
-
-4. Start implementation:
-   ```bash
-   /implement
-   ```
-
-5. Or work on specific task:
-   ```bash
-   /implement issue-29-pc-top-1
-   ```
-
-**Key Benefits:**
-
-- ✅ **Zero manual intervention**: Fully automated extraction and splitting
-- ✅ **MCP-safe**: All tasks guaranteed under token limits
-- ✅ **Recursive**: Handles deeply nested complex components
-- ✅ **Order preserved**: Children sorted by Y position (top to bottom)
-- ✅ **Seamless implementation**: `/implement` works without re-breakdown
-- ✅ **Clear tracking**: Each task includes node count and parent info
-- ✅ **GitHub integration**: Issues auto-created with all context
-
-**Files Created:**
-
-- `logs/figma-full-file.json` - Full Figma file structure
-- `.claude/data/top-level-frames.txt` - Extracted components list
-- `.claude/tasks/task1.json`, `task2.json`, etc. - Individual task files
-- `.claude/tasks/index.json` - Task index
-- Git branches for each task
-
-**Next Steps:**
-
-The `/implement` command will automatically:
-1. Read task JSON to get nodeId
-2. Use MCP to fetch component code
-3. Generate HTML/CSS/JS
-4. Run Playwright tests
-5. Convert to Liquid
-
-No manual breakdown or node ID lookup needed!
+### Section Splitting Algorithm
+```javascript
+// Group children into logical sections
+function splitIntoSections(frame) {
+  const sections = [];
+  let currentSection = [];
+  let currentNodeCount = 0;
+  
+  const MAX_NODES = 400;
+  const MIN_NODES = 50;
+  
+  // Sort children by Y position (top to bottom)
+  const sortedChildren = frame.children
+    .sort((a, b) => a.y - b.y);
+  
+  for (const child of sortedChildren) {
+    const childNodes = countNodes(child);
+    
+    if (currentNodeCount + childNodes > MAX_NODES && currentNodeCount > MIN_NODES) {
+      // Save current section and start new
+      sections.push(currentSection);
+      currentSection = [child];
+      currentNodeCount = childNodes;
+    } else {
+      // Add to current section
+      currentSection.push(child);
+      currentNodeCount += childNodes;
+    }
+  }
+  
+  // Handle last section
+  if (currentSection.length > 0) {
+    sections.push(currentSection);
+  }
+  
+  return sections;
+}
