@@ -1,0 +1,17 @@
+{
+  "id": "29",
+  "issueNumber": 265,
+  "title": "Frame 1493",
+  "slug": "frame-1493",
+  "branch": "issue-265-frame-1493",
+  "nodeId": "111:59",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:59",
+  "complexity": 9,
+  "nodeCount": 388,
+  "type": "section",
+  "parentComponent": "PC_TOP",
+  "sectionNumber": 7,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
