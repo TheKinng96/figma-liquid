@@ -1,0 +1,17 @@
+{
+  "id": "90",
+  "issueNumber": 326,
+  "title": "Frame 622",
+  "slug": "frame-622",
+  "branch": "issue-326-frame-622",
+  "nodeId": "111:2626",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2626",
+  "complexity": 7,
+  "nodeCount": 165,
+  "type": "section",
+  "parentComponent": "Frame 1592",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
