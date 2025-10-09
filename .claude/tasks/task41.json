@@ -1,0 +1,17 @@
+{
+  "id": "41",
+  "issueNumber": 277,
+  "title": "ボタンA・B",
+  "slug": "a-b",
+  "branch": "issue-277-a-b",
+  "nodeId": "111:1126",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:1126",
+  "complexity": 3,
+  "nodeCount": 26,
+  "type": "section",
+  "parentComponent": "Frame 1551",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
