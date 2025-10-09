@@ -1,0 +1,17 @@
+{
+  "id": "69",
+  "issueNumber": 305,
+  "title": "ドロワー用検索",
+  "slug": "component-69",
+  "branch": "issue-305-component-69",
+  "nodeId": "111:2117",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2117",
+  "complexity": 5,
+  "nodeCount": 64,
+  "type": "section",
+  "parentComponent": "ドロワー",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
