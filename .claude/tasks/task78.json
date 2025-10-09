@@ -1,0 +1,17 @@
+{
+  "id": "78",
+  "issueNumber": 314,
+  "title": "ヘッダーE",
+  "slug": "e",
+  "branch": "issue-314-e",
+  "nodeId": "111:2273",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2273",
+  "complexity": 9,
+  "nodeCount": 399,
+  "type": "layout",
+  "parentComponent": "PC_商品詳細",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
