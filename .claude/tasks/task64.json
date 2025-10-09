@@ -1,0 +1,17 @@
+{
+  "id": "64",
+  "issueNumber": 300,
+  "title": "Frame 1650",
+  "slug": "frame-1650",
+  "branch": "issue-300-frame-1650",
+  "nodeId": "111:1928",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:1928",
+  "complexity": 3,
+  "nodeCount": 17,
+  "type": "section",
+  "parentComponent": "SP_商品詳細",
+  "sectionNumber": 3,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
