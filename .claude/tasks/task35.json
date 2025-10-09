@@ -1,0 +1,17 @@
+{
+  "id": "35",
+  "issueNumber": 271,
+  "title": "メインスライダーA",
+  "slug": "a",
+  "branch": "issue-271-a",
+  "nodeId": "111:858",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:858",
+  "complexity": 3,
+  "nodeCount": 47,
+  "type": "section",
+  "parentComponent": "SP_TOP",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
