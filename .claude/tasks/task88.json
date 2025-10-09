@@ -1,0 +1,17 @@
+{
+  "id": "88",
+  "issueNumber": 324,
+  "title": "Frame 615",
+  "slug": "frame-615",
+  "branch": "issue-324-frame-615",
+  "nodeId": "111:2595",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2595",
+  "complexity": 5,
+  "nodeCount": 67,
+  "type": "section",
+  "parentComponent": "Frame 1593",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
