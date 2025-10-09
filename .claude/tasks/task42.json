@@ -1,0 +1,17 @@
+{
+  "id": "42",
+  "issueNumber": 278,
+  "title": "Frame 1570",
+  "slug": "frame-1570",
+  "branch": "issue-278-frame-1570",
+  "nodeId": "111:1130",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:1130",
+  "complexity": 9,
+  "nodeCount": 307,
+  "type": "section",
+  "parentComponent": "SP_TOP",
+  "sectionNumber": 7,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
