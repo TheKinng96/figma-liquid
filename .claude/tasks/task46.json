@@ -1,0 +1,17 @@
+{
+  "id": "46",
+  "issueNumber": 282,
+  "title": "Frame 1581",
+  "slug": "frame-1581",
+  "branch": "issue-282-frame-1581",
+  "nodeId": "111:1283",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:1283",
+  "complexity": 3,
+  "nodeCount": 18,
+  "type": "section",
+  "parentComponent": "Frame 1589",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
