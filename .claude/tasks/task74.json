@@ -1,0 +1,17 @@
+{
+  "id": "74",
+  "issueNumber": 310,
+  "title": "メニューA アコーディオン",
+  "slug": "a",
+  "branch": "issue-310-a",
+  "nodeId": "111:2199",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:2199",
+  "complexity": 7,
+  "nodeCount": 184,
+  "type": "section",
+  "parentComponent": "ドロワー",
+  "sectionNumber": 6,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
