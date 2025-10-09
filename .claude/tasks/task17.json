@@ -1,0 +1,17 @@
+{
+  "id": "17",
+  "issueNumber": 253,
+  "title": "Frame 581",
+  "slug": "frame-581",
+  "branch": "issue-253-frame-581",
+  "nodeId": "111:499",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:499",
+  "complexity": 5,
+  "nodeCount": 126,
+  "type": "section",
+  "parentComponent": "商品表示",
+  "sectionNumber": 4,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
