@@ -1,0 +1,17 @@
+{
+  "id": "63",
+  "issueNumber": 299,
+  "title": "Frame 1663",
+  "slug": "frame-1663",
+  "branch": "issue-299-frame-1663",
+  "nodeId": "111:1904",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:1904",
+  "complexity": 5,
+  "nodeCount": 50,
+  "type": "section",
+  "parentComponent": "SP_商品詳細",
+  "sectionNumber": 2,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
