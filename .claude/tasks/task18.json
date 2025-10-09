@@ -1,0 +1,17 @@
+{
+  "id": "18",
+  "issueNumber": 254,
+  "title": "Frame 576",
+  "slug": "frame-576",
+  "branch": "issue-254-frame-576",
+  "nodeId": "111:516",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:516",
+  "complexity": 5,
+  "nodeCount": 126,
+  "type": "section",
+  "parentComponent": "商品表示",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
