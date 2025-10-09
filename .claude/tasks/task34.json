@@ -1,0 +1,17 @@
+{
+  "id": "34",
+  "issueNumber": 270,
+  "title": "ヘッダーD1-2",
+  "slug": "d1-2",
+  "branch": "issue-270-d1-2",
+  "nodeId": "111:866",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:866",
+  "complexity": 7,
+  "nodeCount": 193,
+  "type": "layout",
+  "parentComponent": "SP_TOP",
+  "sectionNumber": 1,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
