@@ -1,0 +1,17 @@
+{
+  "id": "30",
+  "issueNumber": 266,
+  "title": "sec01_bnr_sp",
+  "slug": "sec01-bnr-sp",
+  "branch": "issue-266-sec01-bnr-sp",
+  "nodeId": "111:842",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:842",
+  "complexity": 5,
+  "nodeCount": 53,
+  "type": "section",
+  "parentComponent": "sec01_bnr_sp",
+  "sectionNumber": 0,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
