@@ -1,0 +1,17 @@
+{
+  "id": "20",
+  "issueNumber": 256,
+  "title": "Frame 582",
+  "slug": "frame-582",
+  "branch": "issue-256-frame-582",
+  "nodeId": "111:551",
+  "figmaLink": "https://www.figma.com/design/5NQAM48PSavkdGzGHtipcD/Document?node-id=111:551",
+  "complexity": 5,
+  "nodeCount": 126,
+  "type": "section",
+  "parentComponent": "商品表示",
+  "sectionNumber": 3,
+  "isAutoSplit": false,
+  "status": "pending",
+  "phase": "analysis"
+}
